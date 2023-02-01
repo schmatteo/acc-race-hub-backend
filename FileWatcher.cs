@@ -2,7 +2,7 @@ using System.Text;
 
 class FileWatcher
 {
-  public void Watch(string path, Action<Results> callback)
+  public static void Watch(string path, Action<Results> callback)
   {
     using var watcher = new FileSystemWatcher(@path);
 
@@ -18,13 +18,13 @@ class FileWatcher
   }
 
 
-  private void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
+  private static void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
   {
     var text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
     callback(JsonDeser.Deser(text));
   }
 
-  private void PrintException(Exception? ex)
+  private static void PrintException(Exception? ex)
   {
     if (ex != null)
     {

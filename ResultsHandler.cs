@@ -1,5 +1,10 @@
+using System.Configuration;
+using MongoDB.Driver;
+using MongoDB.Bson;
+
 class ResultsHandler
 {
+  private static string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
   public static void Handle(Results results)
   {
     switch (results?.sessionType)
@@ -17,8 +22,19 @@ class ResultsHandler
   }
   private static void HandleRaceResults(Results results)
   {
-    System.Console.WriteLine("race");
-    System.Console.WriteLine(results?.serverName);
+    // var client = new MongoClient(MongoURI);
+    // var database = client.GetDatabase("acc_race_hub");
+    // var collection = database.GetCollection<BsonDocument>("race_results");
+    // var lol = collection.Find(new BsonDocument()).ToList();
+    // foreach (var l in lol)
+    // {
+    //   System.Console.WriteLine(l);
+    // }
+    var res = results.sessionResult!.leaderBoardLines!;
+    foreach (var l in res)
+    {
+      System.Console.WriteLine(l.car!.raceNumber);
+    }
   }
 
   private static void HandleQualifyingResults(Results results)

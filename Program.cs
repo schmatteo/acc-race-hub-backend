@@ -1,15 +1,14 @@
-class Server
+class Program
 {
-  public static void Main()
-  {
-    FileWatcher watcher = new FileWatcher();
-    watcher.Watch(".", results =>
+    public static void Main()
     {
-      if ((results?.trackName) == null)
-      {
-        return;
-      }
-      ResultsHandler.Handle(results);
-    });
-  }
+        Parallel.Invoke(
+            () => HttpServer.Run(),
+            () => FileWatcher.Watch("../../..", results =>
+            {
+                if ((results?.trackName) == null) return;
+                ResultsHandler.Handle(results);
+            })
+        );
+    }
 }
