@@ -31,8 +31,11 @@ class ResultsHandler
 
     private static async void HandleRaceResults(Results results)
     {
-        var collection = database.GetCollection<BsonDocument>("race_results");
-        await InsertRaceIntoDatabase(collection, results);
+        var raceCollection = database.GetCollection<BsonDocument>("race_results");
+        var manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
+
+        await InsertRaceIntoDatabase(raceCollection, results);
+        await HandleManufacturersStandings(manufacturersCollection, results);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -44,13 +47,10 @@ class ResultsHandler
 
     private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
     {
-        BsonDocument searchQuery = new BsonDocument { { "race", results.serverName } };
-        bool docExists = DocumentExists(collection, searchQuery);
-
-        BsonArray resultsToPush = new BsonArray();
+        BsonArray resultsToPush = new();
         foreach (var driver in results.sessionResult.leaderBoardLines)
         {
-            DriverInResults d = new DriverInResults();
+            DriverInRaceResults d = new();
             d.playerId = driver.currentDriver.playerId;
             d.bestLap = driver.timing.bestLap;
             d.lapCount = driver.timing.lapCount;
@@ -58,28 +58,58 @@ class ResultsHandler
             resultsToPush.Add(d.ToBsonDocument());
         }
 
-        if (!docExists)
+        var searchString = new BsonDocument
         {
-            await collection.InsertOneAsync(new BsonDocument
-            {
-                { "race", results.serverName },
-                { "track", results.trackName},
-                { "results", resultsToPush },
-                { "qualifyingResults", new BsonArray() }
-            });
-        } 
-        else
-        {
-            var update = Builders<BsonDocument>.Update.Set("results", resultsToPush);
-            await collection.UpdateOneAsync(searchQuery, update);
-        }
+            { "race", results.serverName },
+            { "track", results.trackName }
+        };
+        var update = Builders<BsonDocument>.Update.Set("results", resultsToPush);
+        var options = new UpdateOptions { IsUpsert = true };
 
+        await collection.UpdateOneAsync(searchString, update, options);
         Console.WriteLine("Inserted race results into database");
     }
 
+    private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results)
+    {
+        int totalLaps = results.sessionResult.leaderBoardLines[0].timing.lapCount;
+        Dictionary<int, int> carPoints = new();
+        foreach (var (driver, index) in results.sessionResult.leaderBoardLines.Select((item, index) => (item, index)))
+        {
+            if (index < 15)
+            {
+                if (driver.timing.lapCount >= totalLaps - 5)
+                {
+                    var car = driver.car.carModel;
+                    var points = Maps.points[index];
+                    try
+                    {
+                        carPoints[car] += points;
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        carPoints.Add(car, points);
+                    }
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var options = new UpdateOptions { IsUpsert = true };
+        foreach (var item in carPoints)
+        {
+            var pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
+            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.cars[item.Key] } }, pointsToAdd, options);
+        }
+    }
+
+    /// Makes a call to the database finding the first occurence. Not really suitable for high frequency of calls as it makes them one by one.
     private static bool DocumentExists(IMongoCollection<BsonDocument> collection, BsonDocument searchDoc)
     {
-        var existing = collection.Find(searchDoc).FirstOrDefault();
+        BsonDocument? existing = collection.Find(searchDoc).FirstOrDefault();
         if (existing != null)
         {
             return true;
@@ -87,7 +117,7 @@ class ResultsHandler
         return false;
     }
 
-    private class DriverInResults
+    private class DriverInRaceResults
     {
         public string? playerId { get; set; }
         public int bestLap { get; set; }

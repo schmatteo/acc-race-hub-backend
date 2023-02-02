@@ -26,7 +26,7 @@ class DriverResult
     public Car car { get; set; }
     public Driver currentDriver { get; set; }
     public int currentDriverIndex { get; set; }
-    public Timing? timing { get; set; }
+    public Timing timing { get; set; }
     public int missingMandatoryPitstop { get; set; }
     public float[]? driverTotalTimes { get; set; }
 }
