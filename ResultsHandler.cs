@@ -32,6 +32,21 @@ class ResultsHandler
     private static async void HandleRaceResults(Results results)
     {
         var collection = database.GetCollection<BsonDocument>("race_results");
+        await InsertRaceIntoDatabase(collection, results);
+    }
+
+    private static void HandleQualifyingResults(Results results)
+    {
+        // TODO: handle quali results
+        System.Console.WriteLine("q");
+        System.Console.WriteLine(results?.serverName);
+    }
+
+    private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
+    {
+        BsonDocument searchQuery = new BsonDocument { { "race", results.serverName } };
+        bool docExists = DocumentExists(collection, searchQuery);
+
         BsonArray resultsToPush = new BsonArray();
         foreach (var driver in results.sessionResult.leaderBoardLines)
         {
@@ -43,20 +58,33 @@ class ResultsHandler
             resultsToPush.Add(d.ToBsonDocument());
         }
 
-        await collection.InsertOneAsync(new BsonDocument
+        if (!docExists)
         {
-            {"race", results.serverName },
-            {"track", results.trackName},
-            {"results", resultsToPush }
-        });
+            await collection.InsertOneAsync(new BsonDocument
+            {
+                { "race", results.serverName },
+                { "track", results.trackName},
+                { "results", resultsToPush },
+                { "qualifyingResults", new BsonArray() }
+            });
+        } 
+        else
+        {
+            var update = Builders<BsonDocument>.Update.Set("results", resultsToPush);
+            await collection.UpdateOneAsync(searchQuery, update);
+        }
 
-        Console.WriteLine("inserted?");
+        Console.WriteLine("Inserted race results into database");
     }
 
-    private static void HandleQualifyingResults(Results results)
+    private static bool DocumentExists(IMongoCollection<BsonDocument> collection, BsonDocument searchDoc)
     {
-        System.Console.WriteLine("q");
-        System.Console.WriteLine(results?.serverName);
+        var existing = collection.Find(searchDoc).FirstOrDefault();
+        if (existing != null)
+        {
+            return true;
+        }
+        return false;
     }
 
     private class DriverInResults
