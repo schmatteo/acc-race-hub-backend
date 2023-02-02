@@ -2,12 +2,26 @@ using System.Collections.Generic;
 
 class Maps
 {
-    public static int[] points =
+    public static Dictionary<int, int> Points = new()
     {
-        50, 45, 40, 35, 30, 25, 22, 19, 16, 13, 10, 8, 6, 4, 2
+        { 1, 50 },
+        { 2, 45 },
+        { 3, 40 },
+        { 4, 35 },
+        { 5, 30 },
+        { 6, 25 },
+        { 7, 22 },
+        { 8, 19 },
+        { 9, 16 },
+        { 10, 13 },
+        { 11, 10 },
+        { 12, 8 },
+        { 13, 6 },
+        { 14, 4 },
+        { 15, 2 }
     };
 
-    public static Dictionary<int, string> cars = new()
+    public static Dictionary<int, string> Cars = new()
     {
         { 0, "Porsche 911 GT3 R"},
         { 1, "Mercedes-AMG GT3" },
@@ -49,4 +63,11 @@ class Maps
         { 60, "Mercedes AMG GT4" },
         { 61, "Porsche 718 Cayman GT4 Clubsport" }
     };
+
+    public enum Classes
+    {
+        pro = 3,
+        silver = 1,
+        am = 0
+    }
 }

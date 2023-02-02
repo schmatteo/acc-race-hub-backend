@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Driver.Linq;
+using MongoDB.Bson.Serialization.Attributes;
 
 class ResultsHandler
 {
     private static string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
-    private static MongoClient client = new MongoClient(MongoURI);
-    private static IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
     public static void Handle(Results results)
     {
@@ -21,7 +21,7 @@ class ResultsHandler
                 ResultsHandler.HandleRaceResults(results);
                 break;
             case "P":
-                System.Console.Error.WriteLine("Practice session result handling is not currently supported");
+                System.Console.Error.WriteLine("Practice session results handling is not currently supported");
                 break;
             default:
                 System.Console.Error.WriteLine("Unknown session type");
@@ -31,11 +31,19 @@ class ResultsHandler
 
     private static async void HandleRaceResults(Results results)
     {
+        MongoClientSettings settings = MongoClientSettings.FromConnectionString(MongoURI);
+        settings.LinqProvider = LinqProvider.V3;
+        MongoClient client = new MongoClient(settings);
+        IMongoDatabase database = client.GetDatabase("acc_race_hub");
+
         var raceCollection = database.GetCollection<BsonDocument>("race_results");
         var manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
+        var driversCollection = database.GetCollection<BsonDocument>("drivers_standings");
+        var entrylistCollection = database.GetCollection<Entrylist>("entrylist");
 
         await InsertRaceIntoDatabase(raceCollection, results);
         await HandleManufacturersStandings(manufacturersCollection, results);
+        await HandleIndividualResults(driversCollection, entrylistCollection, results);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -47,7 +55,7 @@ class ResultsHandler
 
     private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
     {
-        BsonArray resultsToPush = new();
+        BsonArray resultsToInsert = new();
         foreach (var driver in results.sessionResult.leaderBoardLines)
         {
             DriverInRaceResults d = new();
@@ -55,7 +63,7 @@ class ResultsHandler
             d.bestLap = driver.timing.bestLap;
             d.lapCount = driver.timing.lapCount;
             d.totalTime = driver.timing.totalTime;
-            resultsToPush.Add(d.ToBsonDocument());
+            resultsToInsert.Add(d.ToBsonDocument());
         }
 
         var searchString = new BsonDocument
@@ -63,7 +71,7 @@ class ResultsHandler
             { "race", results.serverName },
             { "track", results.trackName }
         };
-        var update = Builders<BsonDocument>.Update.Set("results", resultsToPush);
+        var update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
         var options = new UpdateOptions { IsUpsert = true };
 
         await collection.UpdateOneAsync(searchString, update, options);
@@ -81,7 +89,7 @@ class ResultsHandler
                 if (driver.timing.lapCount >= totalLaps - 5)
                 {
                     var car = driver.car.carModel;
-                    var points = Maps.points[index];
+                    var points = Maps.Points[index + 1];
                     try
                     {
                         carPoints[car] += points;
@@ -102,7 +110,37 @@ class ResultsHandler
         foreach (var item in carPoints)
         {
             var pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
-            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.cars[item.Key] } }, pointsToAdd, options);
+            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+        }
+    }
+
+    private static async Task HandleIndividualResults(IMongoCollection<BsonDocument> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
+    {
+        Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
+        foreach (var driver in results.sessionResult.leaderBoardLines)
+        {
+            IMongoQueryable<Entrylist> query = (from doc in entrylistCollection.AsQueryable()
+                                                where doc.Drivers[0].PlayerID == driver.currentDriver.playerId
+                                                select doc);
+            if (query.Any())
+            {
+                try
+                {
+                    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.currentDriver.playerId });
+                }
+                catch (KeyNotFoundException)
+                {
+                    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.currentDriver.playerId } });
+                }
+            }
+
+
+            //Console.WriteLine(query.FirstOrDefault().RaceNumber);
+        }
+        foreach (var entry in resultsToInsert[(Maps.Classes)1])
+        {
+            Console.WriteLine(entry.PlayerId);
         }
     }
 
@@ -124,4 +162,83 @@ class ResultsHandler
         public int lapCount { get; set; }
         public int totalTime { get; set; }
     }
+
+#pragma warning disable 8618
+
+    private class Entrylist
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; }
+
+        [BsonElement("drivers")]
+        public Driver[] Drivers { get; set; }
+
+        [BsonElement("raceNumber")]
+        public int RaceNumber { get; set; }
+
+        [BsonElement("forcedCarModel")]
+        public int ForcedCarModel { get; }
+
+        [BsonElement("overrideDriverInfo")]
+        public int OverrideDriverInfo { get; set; }
+
+        [BsonElement("defaultGridPosition")]
+        public int DefaultGridPosition { get; set; }
+
+        [BsonElement("isServerAdmin")]
+        public int IsServerAdmin { get; set; }
+    }
+
+    private class Driver
+    {
+        [BsonElement("firstName")]
+        public string FirstName { get; set; }
+
+        [BsonElement("lastName")]
+        public string LastName { get; set; }
+
+        [BsonElement("shortName")]
+        public string ShortName { get; set; }
+
+        [BsonElement("nationality")]
+        public int Nationality { get; set; }
+
+        [BsonElement("driverCategory")]
+        public int DriverCategory { get; set; }
+
+        [BsonElement("playerID")]
+        public string PlayerID { get; set; }
+    }
+
+    private class DriverInChampionshipStandings
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? Id { get; set; }
+
+        [BsonElement("playerId")]
+        public string PlayerId { get; set; }
+
+        //[BsonElement("points")]
+        //public int Points { get; set; }
+
+        //[BsonElement("pointsWDrop")]
+        //public int PointsWDrop { get; set; }
+
+        //[BsonElement("finishes")]
+        //public Dictionary<string, object[]> Finishes { get; set; }
+
+        //[BsonElement("roundDropped")]
+        //public int RoundDropped { get; set; }
+    }
+
+    //private enum Classes
+    //{
+    //    pro = 3,
+    //    silver = 1,
+    //    am = 0
+    //}
 }
+
+#pragma warning restore 8618

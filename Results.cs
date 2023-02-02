@@ -1,3 +1,5 @@
+#pragma warning disable 8618
+
 class Results
 {
     public string? sessionType { get; set; }
@@ -83,3 +85,5 @@ class Penalty
     public int violationInLap { get; set; }
     public int clearedInLap { get; set; }
 }
+
+#pragma warning restore 8618
