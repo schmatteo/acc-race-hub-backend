@@ -6,7 +6,7 @@ class Results
     public int raceWeekendIndex { get; set; }
     public string? metaData { get; set; }
     public string? serverName { get; set; }
-    public SessionResult? sessionResult { get; set; }
+    public SessionResult sessionResult { get; set; }
     public Lap[]? laps { get; set; }
     public Penalty[]? penalties { get; set; }
     public object[]? post_race_penalties { get; set; }
@@ -18,13 +18,13 @@ class SessionResult
     public int[]? bestSplits { get; set; }
     public int isWetSession { get; set; }
     public int type { get; set; }
-    public DriverResult[]? leaderBoardLines { get; set; }
+    public DriverResult[] leaderBoardLines { get; set; }
 }
 
 class DriverResult
 {
-    public Car? car { get; set; }
-    public Driver? currentDriver { get; set; }
+    public Car car { get; set; }
+    public Driver currentDriver { get; set; }
     public int currentDriverIndex { get; set; }
     public Timing? timing { get; set; }
     public int missingMandatoryPitstop { get; set; }

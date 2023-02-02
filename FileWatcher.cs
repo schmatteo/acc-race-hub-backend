@@ -2,37 +2,36 @@ using System.Text;
 
 class FileWatcher
 {
-  public static void Watch(string path, Action<Results> callback)
-  {
-    using var watcher = new FileSystemWatcher(@path);
-
-    watcher.NotifyFilter = NotifyFilters.FileName;
-
-    watcher.Created += (sender, e) => OnCreated(sender, e, callback);
-
-    watcher.Filter = "*.json";
-    watcher.EnableRaisingEvents = true;
-
-    Console.WriteLine("Press enter to exit.");
-    Console.ReadLine();
-  }
-
-
-  private static void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
-  {
-    var text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
-    callback(JsonDeser.Deser(text));
-  }
-
-  private static void PrintException(Exception? ex)
-  {
-    if (ex != null)
+    public static void Watch(string path, Action<Results> callback)
     {
-      Console.WriteLine($"Message: {ex.Message}");
-      Console.WriteLine("Stacktrace:");
-      Console.WriteLine(ex.StackTrace);
-      Console.WriteLine();
-      PrintException(ex.InnerException);
+        using var watcher = new FileSystemWatcher(@path);
+
+        watcher.NotifyFilter = NotifyFilters.FileName;
+
+        watcher.Created += (sender, e) => OnCreated(sender, e, callback);
+
+        watcher.Filter = "*.json";
+        watcher.EnableRaisingEvents = true;
+        Console.WriteLine(String.Format("Listening for new files in {0}", watcher.Path));
+        Console.ReadLine();
     }
-  }
+
+
+    private static void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
+    {
+        var text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
+        callback(JsonDeser.Deser(text));
+    }
+
+    private static void PrintException(Exception? ex)
+    {
+        if (ex != null)
+        {
+            Console.WriteLine($"Message: {ex.Message}");
+            Console.WriteLine("Stacktrace:");
+            Console.WriteLine(ex.StackTrace);
+            Console.WriteLine();
+            PrintException(ex.InnerException);
+        }
+    }
 }
