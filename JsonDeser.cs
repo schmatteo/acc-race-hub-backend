@@ -14,7 +14,7 @@ class JsonDeser
         }
         catch (JsonException e)
         {
-            Console.Error.WriteLine(String.Format("Error reading JSON {}", e));
+            Console.Error.WriteLine(String.Format($"Error reading JSON {{}}", e));
         }
         return new Results();
     }

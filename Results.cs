@@ -1,89 +1,187 @@
-#pragma warning disable 8618
+using System.Text.Json.Serialization;
 
 class Results
 {
-    public string? sessionType { get; set; }
-    public string? trackName { get; set; }
-    public int sessionIndex { get; set; }
-    public int raceWeekendIndex { get; set; }
-    public string? metaData { get; set; }
-    public string? serverName { get; set; }
-    public SessionResult sessionResult { get; set; }
-    public Lap[]? laps { get; set; }
-    public Penalty[]? penalties { get; set; }
-    public object[]? post_race_penalties { get; set; }
+    [JsonPropertyName("sessionType")]
+    public string SessionType { get; set; }
+
+    [JsonPropertyName("trackName")]
+    public string TrackName { get; set; }
+
+    [JsonPropertyName("sessionIndex")]
+    public int SessionIndex { get; set; }
+
+    [JsonPropertyName("raceWeekendIndex")]
+    public int RaceWeekendIndex { get; set; }
+
+    [JsonPropertyName("metaData")]
+    public string MetaData { get; set; }
+
+    [JsonPropertyName("serverName")]
+    public string ServerName { get; set; }
+
+    [JsonPropertyName("sessionResult")]
+    public SessionResult SessionResult { get; set; }
+
+    [JsonPropertyName("laps")]
+    public Lap[] Laps { get; set; }
+
+    [JsonPropertyName("penalties")]
+    public CPenalty[] Penalties { get; set; }
+
+    [JsonPropertyName("post_race_penalties")]
+    public object[] PostRacePenalties { get; set; }
 }
 
 class SessionResult
 {
-    public int bestlap { get; set; }
-    public int[]? bestSplits { get; set; }
-    public int isWetSession { get; set; }
-    public int type { get; set; }
-    public DriverResult[] leaderBoardLines { get; set; }
+    [JsonPropertyName("bestlap")]
+    public int BestLap { get; set; }
+
+    [JsonPropertyName("bestSplits")]
+    public int[] BestSplits { get; set; }
+
+    [JsonPropertyName("isWetSession")]
+    public int IsWetSession { get; set; }
+
+    [JsonPropertyName("type")]
+    public int Type { get; set; }
+
+    [JsonPropertyName("leaderBoardLines")]
+    public DriverResult[] LeaderBoardLines { get; set; }
 }
 
 class DriverResult
 {
-    public Car car { get; set; }
-    public Driver currentDriver { get; set; }
-    public int currentDriverIndex { get; set; }
-    public Timing timing { get; set; }
-    public int missingMandatoryPitstop { get; set; }
-    public float[]? driverTotalTimes { get; set; }
+    [JsonPropertyName("car")]
+    public Car Car { get; set; }
+
+    [JsonPropertyName("currentDriver")]
+    public Driver CurrentDriver { get; set; }
+
+    [JsonPropertyName("currentDriverIndex")]
+    public int CurrentDriverIndex { get; set; }
+
+    [JsonPropertyName("timing")]
+    public Timing Timing { get; set; }
+
+    [JsonPropertyName("missingMandatoryPitstop")]
+    public int MissingMandatoryPitstop { get; set; }
+
+    [JsonPropertyName("driverTotalTimes")]
+    public float[] DriverTotalTimes { get; set; }
 }
 
 class Car
 {
-    public int carId { get; set; }
-    public int raceNumber { get; set; }
-    public int carModel { get; set; }
-    public int cupCategory { get; set; }
-    public string? carGroup { get; set; }
-    public string? teamName { get; set; }
-    public int nationality { get; set; }
-    public int carGuid { get; set; }
-    public int teamGuid { get; set; }
-    public Driver[]? drivers { get; set; }
+    [JsonPropertyName("carId")]
+    public int CarId { get; set; }
+
+    [JsonPropertyName("raceNumber")]
+    public int RaceNumber { get; set; }
+
+    [JsonPropertyName("carModel")]
+    public int CarModel { get; set; }
+
+    [JsonPropertyName("cupCategory")]
+    public int CupCategory { get; set; }
+
+    [JsonPropertyName("carGroup")]
+    public string CarGroup { get; set; }
+
+    [JsonPropertyName("teamName")]
+    public string TeamName { get; set; }
+
+    [JsonPropertyName("nationality")]
+    public int Nationality { get; set; }
+
+    [JsonPropertyName("carGuid")]
+    public int CarGuid { get; set; }
+
+    [JsonPropertyName("teamGuid")]
+    public int TeamGuid { get; set; }
+
+    [JsonPropertyName("drivers")]
+    public Driver[] Drivers { get; set; }
 }
 
 class Driver
 {
-    public string? firstName { get; set; }
-    public string? lastName { get; set; }
-    public string? shortName { get; set; }
-    public string? playerId { get; set; }
+    [JsonPropertyName("firstName")]
+    public string FirstName { get; set; }
+
+    [JsonPropertyName("lastName")]
+    public string LastName { get; set; }
+
+    [JsonPropertyName("shortName")]
+    public string ShortName { get; set; }
+
+    [JsonPropertyName("playerId")]
+    public string PlayerId { get; set; }
 }
 
 class Timing
 {
-    public int lastLap { get; set; }
-    public int?[]? lastSplits { get; set; }
-    public int bestLap { get; set; }
-    public int[]? bestSplits { get; set; }
-    public int totalTime { get; set; }
-    public int lapCount { get; set; }
-    public long lastSplitId { get; set; }
+    [JsonPropertyName("lastLap")]
+    public int LastLap { get; set; }
+
+    [JsonPropertyName("lastSplits")]
+    public int[] LastSplits { get; set; }
+
+    [JsonPropertyName("bestLap")]
+    public int BestLap { get; set; }
+
+    [JsonPropertyName("bestSplits")]
+    public int[] BestSplits { get; set; }
+
+    [JsonPropertyName("totalTime")]
+    public int TotalTime { get; set; }
+
+    [JsonPropertyName("lapCount")]
+    public int LapCount { get; set; }
+
+    [JsonPropertyName("lastSplitId")]
+    public long LastSplitId { get; set; }
 }
 
 class Lap
 {
-    public int carId { get; set; }
-    public int driverIndex { get; set; }
-    public int laptime { get; set; }
-    public bool isValidForBest { get; set; }
-    public int[]? splits { get; set; }
+    [JsonPropertyName("carId")]
+    public int CarId { get; set; }
+
+    [JsonPropertyName("driverIndex")]
+    public int DriverIndex { get; set; }
+
+    [JsonPropertyName("laptime")]
+    public int Laptime { get; set; }
+
+    [JsonPropertyName("isValidForBest")]
+    public bool IsValidForBest { get; set; }
+
+    [JsonPropertyName("splits")]
+    public int[] Splits { get; set; }
 }
 
-class Penalty
+class CPenalty
 {
-    public int carId { get; set; }
-    public int driverIndex { get; set; }
-    public string? reason { get; set; }
-    public string? penalty { get; set; }
-    public int penaltyValue { get; set; }
-    public int violationInLap { get; set; }
-    public int clearedInLap { get; set; }
-}
+    [JsonPropertyName("carId")]
+    public int CarId { get; set; }
 
-#pragma warning restore 8618
+    [JsonPropertyName("driverIndex")]
+    public int DriverIndex { get; set; }
+
+    [JsonPropertyName("reason")]
+    public string Reason { get; set; }
+
+    [JsonPropertyName("penalty")]
+    public string Penalty { get; set; }
+
+    [JsonPropertyName("penaltyValue")]
+    public int PenaltyValue { get; set; }
+
+    [JsonPropertyName("violationInLap")]
+    public int ViolationInLap { get; set; }
+
+    [JsonPropertyName("clearedInLap")]
+    public int ClearedInLap { get; set; }
+}

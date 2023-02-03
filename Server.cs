@@ -5,9 +5,9 @@ using System.Collections.Generic;
 
 class HttpServer
 {
-    private static HttpListener? listener;
-    private static List<string> urls = new List<string>() { "http://localhost:4001/", "http://127.0.0.1:4001/" };
-    private static string? pageData = "";
+    private static HttpListener listener;
+    private static readonly List<string> urls = new() { "http://localhost:4001/", "http://127.0.0.1:4001/" };
+    private static string pageData = "";
     private static bool runServer = true;
 
     private static async Task HandleIncomingConnections()

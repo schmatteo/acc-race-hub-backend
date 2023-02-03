@@ -4,9 +4,9 @@ class Program
     {
         Parallel.Invoke(
             () => HttpServer.Run(),
-            () => FileWatcher.Watch("../../..", results =>
+            () => FileWatcher.Watch("../../.", results =>
             {
-                if ((results?.trackName) == null) return;
+                if ((results?.TrackName) == null) return;
                 ResultsHandler.Handle(results);
             })
         );

@@ -8,11 +8,11 @@ using MongoDB.Bson.Serialization.Attributes;
 
 class ResultsHandler
 {
-    private static string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
+    private static readonly string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
 
     public static void Handle(Results results)
     {
-        switch (results?.sessionType)
+        switch (results?.SessionType)
         {
             case "Q":
                 ResultsHandler.HandleQualifyingResults(results);
@@ -33,7 +33,7 @@ class ResultsHandler
     {
         MongoClientSettings settings = MongoClientSettings.FromConnectionString(MongoURI);
         settings.LinqProvider = LinqProvider.V3;
-        MongoClient client = new MongoClient(settings);
+        MongoClient client = new(settings);
         IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
         var raceCollection = database.GetCollection<BsonDocument>("race_results");
@@ -50,26 +50,28 @@ class ResultsHandler
     {
         // TODO: handle quali results
         System.Console.WriteLine("q");
-        System.Console.WriteLine(results?.serverName);
+        System.Console.WriteLine(results?.ServerName);
     }
 
     private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
     {
         BsonArray resultsToInsert = new();
-        foreach (var driver in results.sessionResult.leaderBoardLines)
+        foreach (var driver in results.SessionResult.LeaderBoardLines)
         {
-            DriverInRaceResults d = new();
-            d.playerId = driver.currentDriver.playerId;
-            d.bestLap = driver.timing.bestLap;
-            d.lapCount = driver.timing.lapCount;
-            d.totalTime = driver.timing.totalTime;
+            DriverInRaceResults d = new()
+            {
+                PlayerId = driver.CurrentDriver.PlayerId,
+                BestLap = driver.Timing.BestLap,
+                LapCount = driver.Timing.LapCount,
+                TotalTime = driver.Timing.TotalTime
+            };
             resultsToInsert.Add(d.ToBsonDocument());
         }
 
         var searchString = new BsonDocument
         {
-            { "race", results.serverName },
-            { "track", results.trackName }
+            { "race", results.ServerName },
+            { "track", results.TrackName }
         };
         var update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
         var options = new UpdateOptions { IsUpsert = true };
@@ -80,15 +82,15 @@ class ResultsHandler
 
     private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results)
     {
-        int totalLaps = results.sessionResult.leaderBoardLines[0].timing.lapCount;
+        int totalLaps = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         Dictionary<int, int> carPoints = new();
-        foreach (var (driver, index) in results.sessionResult.leaderBoardLines.Select((item, index) => (item, index)))
+        foreach (var (driver, index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
         {
             if (index < 15)
             {
-                if (driver.timing.lapCount >= totalLaps - 5)
+                if (driver.Timing.LapCount >= totalLaps - 5)
                 {
-                    var car = driver.car.carModel;
+                    var car = driver.Car.CarModel;
                     var points = Maps.Points[index + 1];
                     try
                     {
@@ -118,20 +120,20 @@ class ResultsHandler
     private static async Task HandleIndividualResults(IMongoCollection<BsonDocument> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
     {
         Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
-        foreach (var driver in results.sessionResult.leaderBoardLines)
+        foreach (var driver in results.SessionResult.LeaderBoardLines)
         {
             IMongoQueryable<Entrylist> query = (from doc in entrylistCollection.AsQueryable()
-                                                where doc.Drivers[0].PlayerID == driver.currentDriver.playerId
+                                                where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
                                                 select doc);
             if (query.Any())
             {
                 try
                 {
-                    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.currentDriver.playerId });
+                    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId });
                 }
                 catch (KeyNotFoundException)
                 {
-                    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.currentDriver.playerId } });
+                    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId } });
                 }
             }
 
@@ -157,13 +159,18 @@ class ResultsHandler
 
     private class DriverInRaceResults
     {
-        public string? playerId { get; set; }
-        public int bestLap { get; set; }
-        public int lapCount { get; set; }
-        public int totalTime { get; set; }
-    }
+        [BsonElement("playerId")]
+        public string PlayerId { get; set; }
 
-#pragma warning disable 8618
+        [BsonElement("bestLap")]
+        public int BestLap { get; set; }
+
+        [BsonElement("lapCount")]
+        public int LapCount { get; set; }
+
+        [BsonElement("totalTime")]
+        public int TotalTime { get; set; }
+    }
 
     private class Entrylist
     {
@@ -215,7 +222,7 @@ class ResultsHandler
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string? Id { get; set; }
+        public string Id { get; set; }
 
         [BsonElement("playerId")]
         public string PlayerId { get; set; }
@@ -232,13 +239,4 @@ class ResultsHandler
         //[BsonElement("roundDropped")]
         //public int RoundDropped { get; set; }
     }
-
-    //private enum Classes
-    //{
-    //    pro = 3,
-    //    silver = 1,
-    //    am = 0
-    //}
 }
-
-#pragma warning restore 8618
