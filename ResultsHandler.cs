@@ -148,13 +148,6 @@ internal class ResultsHandler
         }
     }
 
-    /// Makes a call to the database finding the first occurence. Not really suitable for high frequency of calls as it makes them one by one.
-    private static bool DocumentExists(IMongoCollection<BsonDocument> collection, BsonDocument searchDoc)
-    {
-        BsonDocument? existing = collection.Find(searchDoc).FirstOrDefault();
-        return existing != null;
-    }
-
     private class DriverInRaceResults
     {
         [BsonElement("playerId")]
