@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-class Maps
+internal class Maps
 {
     public static Dictionary<int, int> Points = new()
     {

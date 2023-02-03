@@ -1,10 +1,10 @@
 using System.Text;
 
-class FileWatcher
+internal class FileWatcher
 {
     public static void Watch(string path, Action<Results> callback)
     {
-        using var watcher = new FileSystemWatcher(@path);
+        using FileSystemWatcher watcher = new(@path);
 
         watcher.NotifyFilter = NotifyFilters.FileName;
 
@@ -12,14 +12,14 @@ class FileWatcher
 
         watcher.Filter = "*.json";
         watcher.EnableRaisingEvents = true;
-        Console.WriteLine(String.Format("Listening for new files in {0}", watcher.Path));
-        Console.ReadLine();
+        Console.WriteLine(string.Format("Listening for new files in {0}", watcher.Path));
+        _ = Console.ReadLine();
     }
 
 
     private static void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
     {
-        var text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
+        string text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
         callback(JsonDeser.Deser(text));
     }
 

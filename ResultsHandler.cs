@@ -1,12 +1,10 @@
-using System.Configuration;
-using System.Collections.Generic;
-using MongoDB.Driver;
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Driver.Linq;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
+using System.Configuration;
 
-class ResultsHandler
+internal class ResultsHandler
 {
     private static readonly string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
 
@@ -36,14 +34,14 @@ class ResultsHandler
         MongoClient client = new(settings);
         IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
-        var raceCollection = database.GetCollection<BsonDocument>("race_results");
-        var manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
-        var driversCollection = database.GetCollection<BsonDocument>("drivers_standings");
-        var entrylistCollection = database.GetCollection<Entrylist>("entrylist");
+        IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
+        IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
+        IMongoCollection<BsonDocument> driversCollection = database.GetCollection<BsonDocument>("drivers_standings");
+        IMongoCollection<Entrylist> entrylistCollection = database.GetCollection<Entrylist>("entrylist");
 
         await InsertRaceIntoDatabase(raceCollection, results);
         await HandleManufacturersStandings(manufacturersCollection, results);
-        await HandleIndividualResults(driversCollection, entrylistCollection, results);
+        HandleIndividualResults(driversCollection, entrylistCollection, results);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -56,7 +54,7 @@ class ResultsHandler
     private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
     {
         BsonArray resultsToInsert = new();
-        foreach (var driver in results.SessionResult.LeaderBoardLines)
+        foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
         {
             DriverInRaceResults d = new()
             {
@@ -65,18 +63,18 @@ class ResultsHandler
                 LapCount = driver.Timing.LapCount,
                 TotalTime = driver.Timing.TotalTime
             };
-            resultsToInsert.Add(d.ToBsonDocument());
+            _ = resultsToInsert.Add(d.ToBsonDocument());
         }
 
-        var searchString = new BsonDocument
+        BsonDocument searchString = new()
         {
             { "race", results.ServerName },
             { "track", results.TrackName }
         };
-        var update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
-        var options = new UpdateOptions { IsUpsert = true };
+        UpdateDefinition<BsonDocument> update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
+        UpdateOptions options = new() { IsUpsert = true };
 
-        await collection.UpdateOneAsync(searchString, update, options);
+        _ = await collection.UpdateOneAsync(searchString, update, options);
         Console.WriteLine("Inserted race results into database");
     }
 
@@ -84,14 +82,14 @@ class ResultsHandler
     {
         int totalLaps = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         Dictionary<int, int> carPoints = new();
-        foreach (var (driver, index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
+        foreach ((DriverResult driver, int index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
         {
             if (index < 15)
             {
                 if (driver.Timing.LapCount >= totalLaps - 5)
                 {
-                    var car = driver.Car.CarModel;
-                    var points = Maps.Points[index + 1];
+                    int car = driver.Car.CarModel;
+                    int points = Maps.Points[index + 1];
                     try
                     {
                         carPoints[car] += points;
@@ -108,23 +106,23 @@ class ResultsHandler
             }
         }
 
-        var options = new UpdateOptions { IsUpsert = true };
-        foreach (var item in carPoints)
+        UpdateOptions options = new() { IsUpsert = true };
+        foreach (KeyValuePair<int, int> item in carPoints)
         {
-            var pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
-            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
-            await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+            UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
+            _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+            _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
         }
     }
 
-    private static async Task HandleIndividualResults(IMongoCollection<BsonDocument> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
+    private static void HandleIndividualResults(IMongoCollection<BsonDocument> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
     {
         Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
-        foreach (var driver in results.SessionResult.LeaderBoardLines)
+        foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
         {
-            IMongoQueryable<Entrylist> query = (from doc in entrylistCollection.AsQueryable()
-                                                where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
-                                                select doc);
+            IMongoQueryable<Entrylist> query = from doc in entrylistCollection.AsQueryable()
+                                               where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
+                                               select doc;
             if (query.Any())
             {
                 try
@@ -140,9 +138,13 @@ class ResultsHandler
 
             //Console.WriteLine(query.FirstOrDefault().RaceNumber);
         }
-        foreach (var entry in resultsToInsert[(Maps.Classes)1])
+        //foreach (var entry in resultsToInsert[(Maps.Classes)1])
+        //{
+        //    Console.WriteLine(entry.PlayerId);
+        //}
+        foreach (KeyValuePair<Maps.Classes, List<DriverInChampionshipStandings>> e in resultsToInsert)
         {
-            Console.WriteLine(entry.PlayerId);
+            Console.WriteLine(e.Key);
         }
     }
 
@@ -150,11 +152,7 @@ class ResultsHandler
     private static bool DocumentExists(IMongoCollection<BsonDocument> collection, BsonDocument searchDoc)
     {
         BsonDocument? existing = collection.Find(searchDoc).FirstOrDefault();
-        if (existing != null)
-        {
-            return true;
-        }
-        return false;
+        return existing != null;
     }
 
     private class DriverInRaceResults

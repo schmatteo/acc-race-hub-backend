@@ -1,9 +1,7 @@
 using System.Net;
 using System.Text;
-using System.Text.Json;
-using System.Collections.Generic;
 
-class HttpServer
+internal class HttpServer
 {
     private static HttpListener listener;
     private static readonly List<string> urls = new() { "http://localhost:4001/", "http://127.0.0.1:4001/" };

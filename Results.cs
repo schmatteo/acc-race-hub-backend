@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-class Results
+internal class Results
 {
     [JsonPropertyName("sessionType")]
     public string SessionType { get; set; }
@@ -33,7 +33,7 @@ class Results
     public object[] PostRacePenalties { get; set; }
 }
 
-class SessionResult
+internal class SessionResult
 {
     [JsonPropertyName("bestlap")]
     public int BestLap { get; set; }
@@ -51,7 +51,7 @@ class SessionResult
     public DriverResult[] LeaderBoardLines { get; set; }
 }
 
-class DriverResult
+internal class DriverResult
 {
     [JsonPropertyName("car")]
     public Car Car { get; set; }
@@ -72,7 +72,7 @@ class DriverResult
     public float[] DriverTotalTimes { get; set; }
 }
 
-class Car
+internal class Car
 {
     [JsonPropertyName("carId")]
     public int CarId { get; set; }
@@ -105,7 +105,7 @@ class Car
     public Driver[] Drivers { get; set; }
 }
 
-class Driver
+internal class Driver
 {
     [JsonPropertyName("firstName")]
     public string FirstName { get; set; }
@@ -120,7 +120,7 @@ class Driver
     public string PlayerId { get; set; }
 }
 
-class Timing
+internal class Timing
 {
     [JsonPropertyName("lastLap")]
     public int LastLap { get; set; }
@@ -144,7 +144,7 @@ class Timing
     public long LastSplitId { get; set; }
 }
 
-class Lap
+internal class Lap
 {
     [JsonPropertyName("carId")]
     public int CarId { get; set; }
@@ -162,7 +162,7 @@ class Lap
     public int[] Splits { get; set; }
 }
 
-class CPenalty
+internal class CPenalty
 {
     [JsonPropertyName("carId")]
     public int CarId { get; set; }
