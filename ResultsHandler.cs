@@ -37,11 +37,11 @@ internal class ResultsHandler
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
         IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
-        IMongoCollection<Entrylist> entrylistCollection = database.GetCollection<Entrylist>("entrylist");
+        IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
-        await InsertRaceIntoDatabase(raceCollection, results);
-        await HandleManufacturersStandings(manufacturersCollection, results);
-        HandleIndividualResults(driversCollection, entrylistCollection, results);
+        //await InsertRaceIntoDatabase(raceCollection, results);
+        //await HandleManufacturersStandings(manufacturersCollection, results);
+        await HandleIndividualResults(driversCollection, entrylistCollection, results);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -114,10 +114,19 @@ internal class ResultsHandler
         }
     }
 
-    private static void HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
+    private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results)
     {
         var entrylistQuery = (from doc in entrylistCollection.AsQueryable() select doc).Distinct();
         var entrylist = entrylistQuery.ToList();
+
+        var sortedRaceResults = results.SessionResult.LeaderBoardLines
+            .Join(entrylist,
+                result => result.CurrentDriver.PlayerId,
+                entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
+                (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId).DriverCategory })
+            .GroupBy(x => x.Class)
+            .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
+        var purples = GetFastestLap(sortedRaceResults);
 
         foreach (var entry in entrylist)
         {
@@ -125,10 +134,40 @@ internal class ResultsHandler
                                   where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
                                   select doc;
 
+            DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
+            BsonDocument documentToInsert = new();
+            UpdateDefinition<DriverInChampionshipStandings> pointsToInc;
+
             if (driverInResults.Any())
             {
-                Console.WriteLine(driverInResults.First().Car.RaceNumber);
+                int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
+                int points = Maps.Points[place];
+
+
+                var purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
+                if (purple) points += 3;
+
+                //documentToInsert.Add("$inc", new BsonDocument { { "points", points } });
+                //documentToInsert.Add("$push", new BsonDocument { { "finishes", new BsonDocument { { "$set", new BsonDocument { { results.ServerName, new Tuple<int, bool, int>(place, purple, points) } } } } });
+                //driverToInsert.Finishes.Add(results.ServerName, new Tuple<int, bool, int>(place, purple, points));
+
+                //Builders<DriverInChampionshipStandings>.Update.Set()
+                Console.WriteLine(driverInResults.First().CurrentDriver.LastName);
+                Console.WriteLine(points);
             }
+            else
+            {
+                driverToInsert.Finishes.Add(results.ServerName, new Tuple<int, bool, int>(-1, false, 0));
+                driverToInsert.Points = 0;
+                pointsToInc = Builders<DriverInChampionshipStandings>.Update.Inc("points", 0);
+            }
+
+            //var update = Builders<DriverInChampionshipStandings>.Update.Combine(
+            //    pointsToInc, driverToInsert.ToBsonDocument()
+            //);
+
+            UpdateOptions options = new() { IsUpsert = true };
+            //await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
         }
 
         //Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
@@ -164,6 +203,20 @@ internal class ResultsHandler
         //}
     }
 
+    private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
+    {
+        Dictionary<Maps.Classes, DriverResult> fastest = new();
+        foreach (var entry in results)
+        {
+            var purple = entry.Value.Min(x => x.Timing.BestLap);
+            var holder = from doc in entry.Value
+                         where doc.Timing.BestLap == purple
+                         select doc;
+            fastest.Add(entry.Key, holder.First());
+        }
+        return fastest;
+    }
+
     private class DriverInRaceResults
     {
         [BsonElement("playerId")]
@@ -179,7 +232,7 @@ internal class ResultsHandler
         public int TotalTime { get; set; }
     }
 
-    private class Entrylist
+    private class EntrylistEntry
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
@@ -240,8 +293,9 @@ internal class ResultsHandler
         [BsonElement("pointsWDrop")]
         public int PointsWithDrop { get; set; }
 
+        // track: [finishing_position, fastest_lap?, points_for_the_round]
         [BsonElement("finishes")]
-        public Dictionary<string, Tuple<object, bool, int>> Finishes { get; set; }
+        public Dictionary<string, Tuple<int, bool, int>> Finishes { get; set; } = new();
 
         [BsonElement("roundDropped")]
         public int RoundDropped { get; set; }
