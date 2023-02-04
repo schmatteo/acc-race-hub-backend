@@ -36,7 +36,7 @@ internal class ResultsHandler
 
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
-        IMongoCollection<BsonDocument> driversCollection = database.GetCollection<BsonDocument>("drivers_standings");
+        IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
         IMongoCollection<Entrylist> entrylistCollection = database.GetCollection<Entrylist>("entrylist");
 
         await InsertRaceIntoDatabase(raceCollection, results);
@@ -89,7 +89,7 @@ internal class ResultsHandler
                 if (driver.Timing.LapCount >= totalLaps - 5)
                 {
                     int car = driver.Car.CarModel;
-                    int points = Maps.Points[index + 1];
+                    int points = Maps.Points[index];
                     try
                     {
                         carPoints[car] += points;
@@ -111,41 +111,57 @@ internal class ResultsHandler
         {
             UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
             _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
-            _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
         }
     }
 
-    private static void HandleIndividualResults(IMongoCollection<BsonDocument> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
+    private static void HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<Entrylist> entrylistCollection, Results results)
     {
-        Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
-        foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
+        var entrylistQuery = (from doc in entrylistCollection.AsQueryable() select doc).Distinct();
+        var entrylist = entrylistQuery.ToList();
+
+        foreach (var entry in entrylist)
         {
-            IMongoQueryable<Entrylist> query = from doc in entrylistCollection.AsQueryable()
-                                               where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
-                                               select doc;
-            if (query.Any())
+            var driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
+                                  where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
+                                  select doc;
+
+            if (driverInResults.Any())
             {
-                try
-                {
-                    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId });
-                }
-                catch (KeyNotFoundException)
-                {
-                    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId } });
-                }
+                Console.WriteLine(driverInResults.First().Car.RaceNumber);
             }
-
-
-            //Console.WriteLine(query.FirstOrDefault().RaceNumber);
         }
+
+        //Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
+        //foreach ((DriverResult driver, int index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
+        //{
+        //    IMongoQueryable<Entrylist> query = from doc in entrylistCollection.AsQueryable()
+        //                                       where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
+        //                                       select doc;
+        //    if (query.Any())
+        //    {
+        //        IMongoQueryable<DriverInChampionshipStandings> findPlayer = from doc in collection.AsQueryable()
+        //                                                                    where doc.PlayerId == driver.CurrentDriver.PlayerId
+        //                                                                    select doc;
+
+        //        if (findPlayer.Any())
+        //        {
+
+        //        }
+
+        //        //try
+        //        //{
+        //        //    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId });
+        //        //}
+        //        //catch (KeyNotFoundException)
+        //        //{
+        //        //    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId } });
+        //        //}
+        //    }
+        //}
         //foreach (var entry in resultsToInsert[(Maps.Classes)1])
         //{
         //    Console.WriteLine(entry.PlayerId);
         //}
-        foreach (KeyValuePair<Maps.Classes, List<DriverInChampionshipStandings>> e in resultsToInsert)
-        {
-            Console.WriteLine(e.Key);
-        }
     }
 
     private class DriverInRaceResults
@@ -218,16 +234,16 @@ internal class ResultsHandler
         [BsonElement("playerId")]
         public string PlayerId { get; set; }
 
-        //[BsonElement("points")]
-        //public int Points { get; set; }
+        [BsonElement("points")]
+        public int Points { get; set; }
 
-        //[BsonElement("pointsWDrop")]
-        //public int PointsWDrop { get; set; }
+        [BsonElement("pointsWDrop")]
+        public int PointsWithDrop { get; set; }
 
-        //[BsonElement("finishes")]
-        //public Dictionary<string, object[]> Finishes { get; set; }
+        [BsonElement("finishes")]
+        public Dictionary<string, Tuple<object, bool, int>> Finishes { get; set; }
 
-        //[BsonElement("roundDropped")]
-        //public int RoundDropped { get; set; }
+        [BsonElement("roundDropped")]
+        public int RoundDropped { get; set; }
     }
 }
