@@ -34,14 +34,18 @@ internal class ResultsHandler
         MongoClient client = new(settings);
         IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
+        int lapCount = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
+        int dnfLapCount = (int)(lapCount * 0.9);
+
+
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
         IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
         IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
         //await InsertRaceIntoDatabase(raceCollection, results);
-        //await HandleManufacturersStandings(manufacturersCollection, results);
-        await HandleIndividualResults(driversCollection, entrylistCollection, results);
+        //await HandleManufacturersStandings(manufacturersCollection, results, dnfLapCount);
+        await HandleIndividualResults(driversCollection, entrylistCollection, results, dnfLapCount);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -78,15 +82,14 @@ internal class ResultsHandler
         Console.WriteLine("Inserted race results into database");
     }
 
-    private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results)
+    private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results, int dnfLapCount)
     {
-        int totalLaps = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         Dictionary<int, int> carPoints = new();
         foreach ((DriverResult driver, int index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
         {
             if (index < 15)
             {
-                if (driver.Timing.LapCount >= totalLaps - 5)
+                if (driver.Timing.LapCount >= dnfLapCount)
                 {
                     int car = driver.Car.CarModel;
                     int points = Maps.Points[index];
@@ -114,9 +117,9 @@ internal class ResultsHandler
         }
     }
 
-    private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results)
+    private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
-        var entrylistQuery = (from doc in entrylistCollection.AsQueryable() select doc).Distinct();
+        var entrylistQuery = from doc in entrylistCollection.AsQueryable() select doc;
         var entrylist = entrylistQuery.ToList();
 
         var sortedRaceResults = results.SessionResult.LeaderBoardLines
@@ -127,7 +130,6 @@ internal class ResultsHandler
             .GroupBy(x => x.Class)
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
         var purples = GetFastestLap(sortedRaceResults);
-
         foreach (var entry in entrylist)
         {
             var driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
@@ -135,72 +137,40 @@ internal class ResultsHandler
                                   select doc;
 
             DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
+            DriverInChampionshipDefinitions updates;
             BsonDocument documentToInsert = new();
-            UpdateDefinition<DriverInChampionshipStandings> pointsToInc;
 
             if (driverInResults.Any())
             {
-                int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
-                int points = Maps.Points[place];
+                bool dnf = driverInResults.First().Timing.LapCount < dnfLapCount;
+                if (dnf)
+                {
+                    updates = new(0, new Tuple<int, bool, int>(-2, false, 0), results.TrackName);
+                }
+                else
+                {
+                    int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
+                    int points = Maps.Points[place];
 
 
-                var purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
-                if (purple) points += 3;
+                    var purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
+                    if (purple) points += 3;
 
-                //documentToInsert.Add("$inc", new BsonDocument { { "points", points } });
-                //documentToInsert.Add("$push", new BsonDocument { { "finishes", new BsonDocument { { "$set", new BsonDocument { { results.ServerName, new Tuple<int, bool, int>(place, purple, points) } } } } });
-                //driverToInsert.Finishes.Add(results.ServerName, new Tuple<int, bool, int>(place, purple, points));
-
-                //Builders<DriverInChampionshipStandings>.Update.Set()
-                Console.WriteLine(driverInResults.First().CurrentDriver.LastName);
-                Console.WriteLine(points);
+                    updates = new(points, new Tuple<int, bool, int>(place, purple, points), results.TrackName);
+                }
             }
             else
             {
-                driverToInsert.Finishes.Add(results.ServerName, new Tuple<int, bool, int>(-1, false, 0));
-                driverToInsert.Points = 0;
-                pointsToInc = Builders<DriverInChampionshipStandings>.Update.Inc("points", 0);
+                updates = new(0, new Tuple<int, bool, int>(-1, false, 0), results.TrackName);
             }
 
-            //var update = Builders<DriverInChampionshipStandings>.Update.Combine(
-            //    pointsToInc, driverToInsert.ToBsonDocument()
-            //);
+            var update = Builders<DriverInChampionshipStandings>.Update.Combine(
+                updates.PointsDefinition, updates.FinishesDefinition
+            );
 
             UpdateOptions options = new() { IsUpsert = true };
-            //await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
+            await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
         }
-
-        //Dictionary<Maps.Classes, List<DriverInChampionshipStandings>> resultsToInsert = new();
-        //foreach ((DriverResult driver, int index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
-        //{
-        //    IMongoQueryable<Entrylist> query = from doc in entrylistCollection.AsQueryable()
-        //                                       where doc.Drivers[0].PlayerID == driver.CurrentDriver.PlayerId
-        //                                       select doc;
-        //    if (query.Any())
-        //    {
-        //        IMongoQueryable<DriverInChampionshipStandings> findPlayer = from doc in collection.AsQueryable()
-        //                                                                    where doc.PlayerId == driver.CurrentDriver.PlayerId
-        //                                                                    select doc;
-
-        //        if (findPlayer.Any())
-        //        {
-
-        //        }
-
-        //        //try
-        //        //{
-        //        //    resultsToInsert[(Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory].Add(new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId });
-        //        //}
-        //        //catch (KeyNotFoundException)
-        //        //{
-        //        //    resultsToInsert.Add((Maps.Classes)query.FirstOrDefault().Drivers[0].DriverCategory, new List<DriverInChampionshipStandings> { new DriverInChampionshipStandings { PlayerId = driver.CurrentDriver.PlayerId } });
-        //        //}
-        //    }
-        //}
-        //foreach (var entry in resultsToInsert[(Maps.Classes)1])
-        //{
-        //    Console.WriteLine(entry.PlayerId);
-        //}
     }
 
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
@@ -293,11 +263,23 @@ internal class ResultsHandler
         [BsonElement("pointsWDrop")]
         public int PointsWithDrop { get; set; }
 
-        // track: [finishing_position, fastest_lap?, points_for_the_round]
+        // track: [finishing_position (-1 = dns, -2 = dnf), fastest_lap?, points_for_the_round]
         [BsonElement("finishes")]
         public Dictionary<string, Tuple<int, bool, int>> Finishes { get; set; } = new();
 
         [BsonElement("roundDropped")]
         public int RoundDropped { get; set; }
+    }
+
+    private class DriverInChampionshipDefinitions
+    {
+        public UpdateDefinition<DriverInChampionshipStandings> PointsDefinition { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> FinishesDefinition { get; }
+
+        public DriverInChampionshipDefinitions(int points, Tuple<int, bool, int> finishes, string trackName)
+        {
+            PointsDefinition = Builders<DriverInChampionshipStandings>.Update.Inc("points", points);
+            FinishesDefinition = Builders<DriverInChampionshipStandings>.Update.Set(String.Format("finishes.{0}", trackName), finishes);
+        }
     }
 }
