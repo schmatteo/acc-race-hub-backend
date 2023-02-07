@@ -47,13 +47,19 @@ internal class ResultsHandler
         await HandleManufacturersStandings(manufacturersCollection, results, dnfLapCount);
         await HandleIndividualResults(driversCollection, entrylistCollection, results, dnfLapCount);
         await HandleDropRound(driversCollection);
+        // TODO: add teams points handling
     }
 
-    private static void HandleQualifyingResults(Results results)
+    private static async void HandleQualifyingResults(Results results)
     {
-        // TODO: handle quali results
-        System.Console.WriteLine("q");
-        System.Console.WriteLine(results?.ServerName);
+        MongoClientSettings settings = MongoClientSettings.FromConnectionString(MongoURI);
+        settings.LinqProvider = LinqProvider.V3;
+        MongoClient client = new(settings);
+        IMongoDatabase database = client.GetDatabase("acc_race_hub");
+
+        var collection = database.GetCollection<BsonDocument>("race_results");
+
+        await InsertQualifyingIntoDatabase(collection, results);
     }
 
     private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
@@ -204,6 +210,25 @@ internal class ResultsHandler
         }
     }
 
+    private static async Task InsertQualifyingIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
+    {
+        BsonArray resultsToInsert = new();
+        foreach (var driver in results.SessionResult.LeaderBoardLines)
+        {
+            var query = from doc in results.Laps
+                        where doc.CarId == driver.Car.CarId
+                        where doc.IsValidForBest
+                        select doc.Laptime;
+            var laps = query.ToList();
+            QualifyingResult result = new(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount, laps);
+            resultsToInsert.Add(result.ToBsonDocument());
+        }
+
+        UpdateOptions options = new() { IsUpsert = true };
+        var update = Builders<BsonDocument>.Update.Set("qualifyingResults", resultsToInsert);
+        await collection.UpdateOneAsync(new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName} }, update, options);
+    }
+
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
     {
         Dictionary<Maps.Classes, DriverResult> fastest = new();
@@ -341,6 +366,22 @@ internal class ResultsHandler
         {
             DropRoundIndex = Builders<DriverInChampionshipStandings>.Update.Set("roundDropped", dropRoundIndex);
             PointsWithDrop = Builders<DriverInChampionshipStandings>.Update.Set("pointsWDrop", pointsWithDrop);
+        }
+    }
+
+    private class QualifyingResult
+    {
+        public string PlayerId { get; }
+        public int BestLap { get; }
+        public int LapCount { get; }
+        public List<int> Laps { get; }
+
+        public QualifyingResult(string playerId, int bestLap, int lapCount, List<int> laps)
+        {
+            PlayerId = playerId;
+            BestLap = bestLap;
+            LapCount = lapCount;
+            Laps = laps;
         }
     }
 }
