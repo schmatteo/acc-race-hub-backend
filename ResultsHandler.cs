@@ -85,8 +85,15 @@ internal class ResultsHandler
         UpdateDefinition<BsonDocument> update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
         UpdateOptions options = new() { IsUpsert = true };
 
-        _ = await collection.UpdateOneAsync(searchString, update, options);
-        Console.WriteLine("Inserted race results into database");
+        try
+        {
+            _ = await collection.UpdateOneAsync(searchString, update, options);
+            Console.WriteLine("Inserted race results into database");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error inserting race results into database {ex.Message}");
+        }
     }
 
     private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results, int dnfLapCount)
@@ -119,67 +126,92 @@ internal class ResultsHandler
         UpdateOptions options = new() { IsUpsert = true };
         foreach (KeyValuePair<int, int> item in carPoints)
         {
-            UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
-            _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+            try
+            {
+                UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
+                _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error updating manufacturers standings {ex.Message}");
+            }
         }
     }
 
     private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
-        List<EntrylistEntry> entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
+        try
+        {
+            List<EntrylistEntry> entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
 
-        Dictionary<Maps.Classes, DriverResult[]> sortedRaceResults = results.SessionResult.LeaderBoardLines
+            Dictionary<Maps.Classes, DriverResult[]> sortedRaceResults = results.SessionResult.LeaderBoardLines
             .Join(entrylist,
                 result => result.CurrentDriver.PlayerId,
                 entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
                 (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId).DriverCategory })
             .GroupBy(x => x.Class)
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
-        Dictionary<Maps.Classes, DriverResult> purples = GetFastestLap(sortedRaceResults);
-        foreach (EntrylistEntry entry in entrylist)
-        {
-            IQueryable<DriverResult> driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
-                                                       where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
-                                                       select doc;
 
-            DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
-            DriverInChampionshipDefinitions updates;
-            BsonDocument documentToInsert = new();
+            Dictionary<Maps.Classes, DriverResult> purples = GetFastestLap(sortedRaceResults);
 
-            if (driverInResults.Any())
+            foreach (EntrylistEntry entry in entrylist)
             {
-                bool dnf = driverInResults.First().Timing.LapCount < dnfLapCount;
-                if (dnf)
+                IQueryable<DriverResult> driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
+                                                           where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
+                                                           select doc;
+
+                DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
+                DriverInChampionshipDefinitions updates;
+                BsonDocument documentToInsert = new();
+
+                if (driverInResults.Any())
                 {
-                    updates = new(0, -2, false, results.TrackName);
+                    bool dnf = driverInResults.First().Timing.LapCount < dnfLapCount;
+                    if (dnf)
+                    {
+                        updates = new(0, -2, false, results.TrackName);
+                    }
+                    else
+                    {
+                        int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
+                        int points = Maps.Points[place];
+
+
+                        bool purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
+                        if (purple)
+                        {
+                            points += 3;
+                        }
+
+                        updates = new(points, place + 1, purple, results.TrackName);
+                    }
                 }
                 else
                 {
-                    int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
-                    int points = Maps.Points[place];
+                    updates = new(0, -1, false, results.TrackName);
+                }
 
+                UpdateDefinition<DriverInChampionshipStandings> update = Builders<DriverInChampionshipStandings>.Update.Combine(
+                    updates.PointsDefinition, updates.FinishesDefinition
+                );
 
-                    bool purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
-                    if (purple)
-                    {
-                        points += 3;
-                    }
-
-                    updates = new(points, place + 1, purple, results.TrackName);
+                UpdateOptions options = new() { IsUpsert = true };
+                try
+                {
+                    _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error inserting driver result into database {ex.Message}");
                 }
             }
-            else
-            {
-                updates = new(0, -1, false, results.TrackName);
-            }
-
-            UpdateDefinition<DriverInChampionshipStandings> update = Builders<DriverInChampionshipStandings>.Update.Combine(
-                updates.PointsDefinition, updates.FinishesDefinition
-            );
-
-            UpdateOptions options = new() { IsUpsert = true };
-            _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
         }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error fetching entrylist {ex.Message}");
+        }
+
+
     }
 
     private static async Task HandleDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
@@ -202,7 +234,14 @@ internal class ResultsHandler
                         DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
 
                         UpdateDefinition<DriverInChampionshipStandings> query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
-                        _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
+                        try
+                        {
+                            _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"Error calculating drop round {ex.Message}");
+                        }
                     }
                 }
             }
@@ -222,6 +261,7 @@ internal class ResultsHandler
                                      where doc.CarId == driver.Car.CarId
                                      where doc.IsValidForBest
                                      select doc.Laptime;
+
             List<int> laps = query.ToList();
             QualifyingResult result = new(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount, laps);
             _ = resultsToInsert.Add(result.ToBsonDocument());
@@ -229,7 +269,15 @@ internal class ResultsHandler
 
         UpdateOptions options = new() { IsUpsert = true };
         UpdateDefinition<BsonDocument> update = Builders<BsonDocument>.Update.Set("qualifyingResults", resultsToInsert);
-        _ = await collection.UpdateOneAsync(new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName } }, update, options);
+
+        try
+        {
+            _ = await collection.UpdateOneAsync(new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName } }, update, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error inserting qualifying results into database {ex.Message}");
+        }
     }
 
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
