@@ -57,7 +57,7 @@ internal class ResultsHandler
         MongoClient client = new(settings);
         IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
-        var collection = database.GetCollection<BsonDocument>("race_results");
+        IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("race_results");
 
         await InsertQualifyingIntoDatabase(collection, results);
     }
@@ -126,21 +126,21 @@ internal class ResultsHandler
 
     private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
-        var entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
+        List<EntrylistEntry> entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
 
-        var sortedRaceResults = results.SessionResult.LeaderBoardLines
+        Dictionary<Maps.Classes, DriverResult[]> sortedRaceResults = results.SessionResult.LeaderBoardLines
             .Join(entrylist,
                 result => result.CurrentDriver.PlayerId,
                 entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
                 (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId).DriverCategory })
             .GroupBy(x => x.Class)
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
-        var purples = GetFastestLap(sortedRaceResults);
-        foreach (var entry in entrylist)
+        Dictionary<Maps.Classes, DriverResult> purples = GetFastestLap(sortedRaceResults);
+        foreach (EntrylistEntry entry in entrylist)
         {
-            var driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
-                                  where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
-                                  select doc;
+            IQueryable<DriverResult> driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
+                                                       where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
+                                                       select doc;
 
             DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
             DriverInChampionshipDefinitions updates;
@@ -159,8 +159,11 @@ internal class ResultsHandler
                     int points = Maps.Points[place];
 
 
-                    var purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
-                    if (purple) points += 3;
+                    bool purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
+                    if (purple)
+                    {
+                        points += 3;
+                    }
 
                     updates = new(points, place + 1, purple, results.TrackName);
                 }
@@ -170,36 +173,36 @@ internal class ResultsHandler
                 updates = new(0, -1, false, results.TrackName);
             }
 
-            var update = Builders<DriverInChampionshipStandings>.Update.Combine(
+            UpdateDefinition<DriverInChampionshipStandings> update = Builders<DriverInChampionshipStandings>.Update.Combine(
                 updates.PointsDefinition, updates.FinishesDefinition
             );
 
             UpdateOptions options = new() { IsUpsert = true };
-            await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
+            _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
         }
     }
 
     private static async Task HandleDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
     {
-        var cursor = await collection.Find(_ => true).ToCursorAsync();
+        IAsyncCursor<DriverInChampionshipStandings> cursor = await collection.Find(_ => true).ToCursorAsync();
 
         try
         {
             while (cursor.MoveNext())
             {
-                foreach (var driver in cursor.Current)
+                foreach (DriverInChampionshipStandings driver in cursor.Current)
                 {
                     if (driver.Finishes.Length > 1)
                     {
-                        var finishesSorted = driver.Finishes.OrderBy(x => x.Points);
-                        var worstFinish = finishesSorted.FirstOrDefault();
-                        var droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
+                        IOrderedEnumerable<DriverInChampionshipStandings.Finish> finishesSorted = driver.Finishes.OrderBy(x => x.Points);
+                        DriverInChampionshipStandings.Finish worstFinish = finishesSorted.FirstOrDefault();
+                        int droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
                         int pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points);
 
                         DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
 
-                        var query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
-                        await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
+                        UpdateDefinition<DriverInChampionshipStandings> query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
+                        _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
                     }
                 }
             }
@@ -213,31 +216,31 @@ internal class ResultsHandler
     private static async Task InsertQualifyingIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
     {
         BsonArray resultsToInsert = new();
-        foreach (var driver in results.SessionResult.LeaderBoardLines)
+        foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
         {
-            var query = from doc in results.Laps
-                        where doc.CarId == driver.Car.CarId
-                        where doc.IsValidForBest
-                        select doc.Laptime;
-            var laps = query.ToList();
+            IEnumerable<int> query = from doc in results.Laps
+                                     where doc.CarId == driver.Car.CarId
+                                     where doc.IsValidForBest
+                                     select doc.Laptime;
+            List<int> laps = query.ToList();
             QualifyingResult result = new(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount, laps);
-            resultsToInsert.Add(result.ToBsonDocument());
+            _ = resultsToInsert.Add(result.ToBsonDocument());
         }
 
         UpdateOptions options = new() { IsUpsert = true };
-        var update = Builders<BsonDocument>.Update.Set("qualifyingResults", resultsToInsert);
-        await collection.UpdateOneAsync(new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName} }, update, options);
+        UpdateDefinition<BsonDocument> update = Builders<BsonDocument>.Update.Set("qualifyingResults", resultsToInsert);
+        _ = await collection.UpdateOneAsync(new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName } }, update, options);
     }
 
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
     {
         Dictionary<Maps.Classes, DriverResult> fastest = new();
-        foreach (var entry in results)
+        foreach (KeyValuePair<Maps.Classes, DriverResult[]> entry in results)
         {
-            var purple = entry.Value.Min(x => x.Timing.BestLap);
-            var holder = from doc in entry.Value
-                         where doc.Timing.BestLap == purple
-                         select doc;
+            int purple = entry.Value.Min(x => x.Timing.BestLap);
+            IEnumerable<DriverResult> holder = from doc in entry.Value
+                                               where doc.Timing.BestLap == purple
+                                               select doc;
             fastest.Add(entry.Key, holder.First());
         }
         return fastest;
@@ -353,7 +356,7 @@ internal class ResultsHandler
         public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)
         {
             PointsDefinition = Builders<DriverInChampionshipStandings>.Update.Inc("points", points);
-            var finishToPush = new DriverInChampionshipStandings.Finish() { TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points };
+            DriverInChampionshipStandings.Finish finishToPush = new() { TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points };
             FinishesDefinition = Builders<DriverInChampionshipStandings>.Update.Push("finishes", finishToPush.ToBsonDocument());
         }
     }
