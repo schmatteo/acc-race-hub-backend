@@ -43,9 +43,10 @@ internal class ResultsHandler
         IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
         IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
-        //await InsertRaceIntoDatabase(raceCollection, results);
-        //await HandleManufacturersStandings(manufacturersCollection, results, dnfLapCount);
+        await InsertRaceIntoDatabase(raceCollection, results);
+        await HandleManufacturersStandings(manufacturersCollection, results, dnfLapCount);
         await HandleIndividualResults(driversCollection, entrylistCollection, results, dnfLapCount);
+        await HandleDropRound(driversCollection);
     }
 
     private static void HandleQualifyingResults(Results results)
@@ -119,8 +120,7 @@ internal class ResultsHandler
 
     private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
-        var entrylistQuery = from doc in entrylistCollection.AsQueryable() select doc;
-        var entrylist = entrylistQuery.ToList();
+        var entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
 
         var sortedRaceResults = results.SessionResult.LeaderBoardLines
             .Join(entrylist,
@@ -145,7 +145,7 @@ internal class ResultsHandler
                 bool dnf = driverInResults.First().Timing.LapCount < dnfLapCount;
                 if (dnf)
                 {
-                    updates = new(0, new Tuple<int, bool, int>(-2, false, 0), results.TrackName);
+                    updates = new(0, -2, false, results.TrackName);
                 }
                 else
                 {
@@ -156,12 +156,12 @@ internal class ResultsHandler
                     var purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
                     if (purple) points += 3;
 
-                    updates = new(points, new Tuple<int, bool, int>(place, purple, points), results.TrackName);
+                    updates = new(points, place + 1, purple, results.TrackName);
                 }
             }
             else
             {
-                updates = new(0, new Tuple<int, bool, int>(-1, false, 0), results.TrackName);
+                updates = new(0, -1, false, results.TrackName);
             }
 
             var update = Builders<DriverInChampionshipStandings>.Update.Combine(
@@ -170,6 +170,37 @@ internal class ResultsHandler
 
             UpdateOptions options = new() { IsUpsert = true };
             await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
+        }
+    }
+
+    private static async Task HandleDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
+    {
+        var cursor = await collection.Find(_ => true).ToCursorAsync();
+
+        try
+        {
+            while (cursor.MoveNext())
+            {
+                foreach (var driver in cursor.Current)
+                {
+                    if (driver.Finishes.Length > 1)
+                    {
+                        var finishesSorted = driver.Finishes.OrderBy(x => x.Points);
+                        var worstFinish = finishesSorted.FirstOrDefault();
+                        var droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
+                        int pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points);
+
+                        DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
+
+                        var query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
+                        await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            cursor.Dispose();
         }
     }
 
@@ -264,8 +295,26 @@ internal class ResultsHandler
         public int PointsWithDrop { get; set; }
 
         // track: [finishing_position (-1 = dns, -2 = dnf), fastest_lap?, points_for_the_round]
+        [BsonIgnore]
+        public Dictionary<string, Tuple<int, bool, int>> OldFinishes { get; set; } = new();
+
+        public class Finish
+        {
+            [BsonElement("trackName")]
+            public string TrackName { get; set; }
+
+            [BsonElement("finishingPosition")]
+            public int FinishingPosition { get; set; }
+
+            [BsonElement("fastestLap")]
+            public bool FastestLap { get; set; }
+
+            [BsonElement("points")]
+            public int Points { get; set; }
+        }
+
         [BsonElement("finishes")]
-        public Dictionary<string, Tuple<int, bool, int>> Finishes { get; set; } = new();
+        public Finish[] Finishes { get; set; }
 
         [BsonElement("roundDropped")]
         public int RoundDropped { get; set; }
@@ -276,10 +325,22 @@ internal class ResultsHandler
         public UpdateDefinition<DriverInChampionshipStandings> PointsDefinition { get; }
         public UpdateDefinition<DriverInChampionshipStandings> FinishesDefinition { get; }
 
-        public DriverInChampionshipDefinitions(int points, Tuple<int, bool, int> finishes, string trackName)
+        public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)
         {
             PointsDefinition = Builders<DriverInChampionshipStandings>.Update.Inc("points", points);
-            FinishesDefinition = Builders<DriverInChampionshipStandings>.Update.Set(String.Format("finishes.{0}", trackName), finishes);
+            var finishToPush = new DriverInChampionshipStandings.Finish() { TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points };
+            FinishesDefinition = Builders<DriverInChampionshipStandings>.Update.Push("finishes", finishToPush.ToBsonDocument());
+        }
+    }
+
+    private class DropRoundDefinitions
+    {
+        public UpdateDefinition<DriverInChampionshipStandings> DropRoundIndex { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> PointsWithDrop { get; }
+        public DropRoundDefinitions(int dropRoundIndex, int pointsWithDrop)
+        {
+            DropRoundIndex = Builders<DriverInChampionshipStandings>.Update.Set("roundDropped", dropRoundIndex);
+            PointsWithDrop = Builders<DriverInChampionshipStandings>.Update.Set("pointsWDrop", pointsWithDrop);
         }
     }
 }
