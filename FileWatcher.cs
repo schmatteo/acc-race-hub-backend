@@ -12,7 +12,7 @@ internal class FileWatcher
 
         watcher.Filter = "*.json";
         watcher.EnableRaisingEvents = true;
-        Console.WriteLine(string.Format("Listening for new files in {0}", watcher.Path));
+        Console.WriteLine($"Listening for new files in {watcher.Path}");
         _ = Console.ReadLine();
     }
 

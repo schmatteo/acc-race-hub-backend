@@ -20,7 +20,7 @@ internal class HttpServer
             Console.WriteLine(req.HttpMethod);
             Console.WriteLine(req.UserHostName);
             Console.WriteLine(req.UserAgent);
-            System.Console.WriteLine(req.Url?.AbsolutePath);
+            Console.WriteLine(req.Url?.AbsolutePath);
             Console.WriteLine();
 
             switch (req.Url?.AbsolutePath)
@@ -87,7 +87,7 @@ internal class HttpServer
         foreach (string url in urls)
         {
             listener.Prefixes.Add(url);
-            Console.WriteLine("Listening on {0}", url);
+            Console.WriteLine($"Listening on {url}");
         }
         listener.Start();
 
