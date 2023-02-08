@@ -1,3 +1,5 @@
+#pragma warning disable 8618
+
 using System.Text.Json.Serialization;
 
 internal class Results
@@ -185,3 +187,5 @@ internal class CPenalty
     [JsonPropertyName("clearedInLap")]
     public int ClearedInLap { get; set; }
 }
+
+#pragma warning restore 8618

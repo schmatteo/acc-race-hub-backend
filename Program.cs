@@ -1,10 +1,12 @@
+using System.Threading.Tasks;
+
 internal class Program
 {
     public static void Main()
     {
         Parallel.Invoke(
             HttpServer.Run,
-            () => FileWatcher.Watch("../../.", results =>
+            () => FileWatcher.Watch("../../..", results =>
             {
                 if ((results?.TrackName) == null)
                 {

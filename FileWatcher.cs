@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text;
 
 internal class FileWatcher
@@ -19,7 +21,7 @@ internal class FileWatcher
 
     private static void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
     {
-        string text = System.IO.File.ReadAllText(e.FullPath, Encoding.Unicode);
+        var text = File.ReadAllText(e.FullPath, Encoding.Unicode);
         callback(JsonDeser.Deser(text));
     }
 
