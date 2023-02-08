@@ -18,7 +18,7 @@ internal class ResultsHandler
             case "R":
                 ResultsHandler.HandleRaceResults(results);
                 break;
-            case "P":
+            case "FP":
                 System.Console.Error.WriteLine("Practice session results handling is not currently supported");
                 break;
             default:
@@ -43,10 +43,31 @@ internal class ResultsHandler
         IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
         IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
-        await InsertRaceIntoDatabase(raceCollection, results);
-        await HandleManufacturersStandings(manufacturersCollection, results, dnfLapCount);
-        await HandleIndividualResults(driversCollection, entrylistCollection, results, dnfLapCount);
-        await HandleDropRound(driversCollection);
+        var insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
+        var updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
+        var updateIndividualResultsTask = UpdateIndividualResultsAsync(driversCollection, entrylistCollection, results, dnfLapCount);
+        List<Task> tasks = new() { insertRaceTask, updateIndividualResultsTask, updateManufacturersTask };
+
+        while (tasks.Count > 0)
+        {
+            Task finishedTask = await Task.WhenAny(tasks);
+            if (finishedTask == insertRaceTask)
+            {
+                Console.WriteLine("Inserted race into database");
+            }
+            else if (finishedTask == updateIndividualResultsTask)
+            {
+                Console.WriteLine("Updated individual results");
+            }
+            else if (finishedTask == updateManufacturersTask)
+            {
+                Console.WriteLine("Updated manufacturers standings");
+            }
+            await finishedTask;
+            tasks.Remove(finishedTask);
+        }
+        UpdateDropRound(driversCollection);
+        Console.WriteLine("Updated drop rounds");
         // TODO: add teams points handling
     }
 
@@ -62,7 +83,7 @@ internal class ResultsHandler
         await InsertQualifyingIntoDatabase(collection, results);
     }
 
-    private static async Task InsertRaceIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
+    private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<BsonDocument> collection, Results results)
     {
         BsonArray resultsToInsert = new();
         foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
@@ -96,7 +117,7 @@ internal class ResultsHandler
         }
     }
 
-    private static async Task HandleManufacturersStandings(IMongoCollection<BsonDocument> collection, Results results, int dnfLapCount)
+    private static async Task UpdateManufacturersStandingsAsync(IMongoCollection<BsonDocument> collection, Results results, int dnfLapCount)
     {
         Dictionary<int, int> carPoints = new();
         foreach ((DriverResult driver, int index) in results.SessionResult.LeaderBoardLines.Select((item, index) => (item, index)))
@@ -138,7 +159,7 @@ internal class ResultsHandler
         }
     }
 
-    private static async Task HandleIndividualResults(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
+    private static async Task UpdateIndividualResultsAsync(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
         try
         {
@@ -214,7 +235,7 @@ internal class ResultsHandler
 
     }
 
-    private static async Task HandleDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
+    private static async void UpdateDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
     {
         IAsyncCursor<DriverInChampionshipStandings> cursor = await collection.Find(_ => true).ToCursorAsync();
 
@@ -293,6 +314,7 @@ internal class ResultsHandler
         }
         return fastest;
     }
+
 
     private class DriverInRaceResults
     {
