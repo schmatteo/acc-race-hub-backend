@@ -53,7 +53,7 @@ internal class ResultsHandler
             Task finishedTask = await Task.WhenAny(tasks);
             if (finishedTask == insertRaceTask)
             {
-                Console.WriteLine("Inserted race into database");
+                Console.WriteLine("Inserted race into the database");
             }
             else if (finishedTask == updateIndividualResultsTask)
             {
@@ -81,6 +81,7 @@ internal class ResultsHandler
         IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("race_results");
 
         await InsertQualifyingIntoDatabase(collection, results);
+        Console.WriteLine("Inserted qualifying results into the database");
     }
 
     private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<BsonDocument> collection, Results results)
