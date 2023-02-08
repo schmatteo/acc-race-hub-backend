@@ -15,7 +15,7 @@ internal class JsonDeser
         }
         catch (JsonException e)
         {
-            Console.Error.WriteLine(string.Format($"Error reading JSON {{}}", e));
+            Console.Error.WriteLine($"Error reading JSON {e}");
         }
         return new Results();
     }

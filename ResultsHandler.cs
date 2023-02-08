@@ -47,9 +47,9 @@ internal class ResultsHandler
         IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
         IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
-        var insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
-        var updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
-        var updateIndividualResultsTask = UpdateIndividualResultsAsync(driversCollection, entrylistCollection, results, dnfLapCount);
+        Task insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
+        Task updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
+        Task updateIndividualResultsTask = UpdateIndividualResultsAsync(driversCollection, entrylistCollection, results, dnfLapCount);
         List<Task> tasks = new() { insertRaceTask, updateIndividualResultsTask, updateManufacturersTask };
 
         while (tasks.Count > 0)
@@ -68,7 +68,7 @@ internal class ResultsHandler
                 Console.WriteLine("Updated manufacturers standings");
             }
             await finishedTask;
-            tasks.Remove(finishedTask);
+            _ = tasks.Remove(finishedTask);
         }
         UpdateDropRound(driversCollection);
         Console.WriteLine("Updated drop rounds");
@@ -324,7 +324,7 @@ internal class ResultsHandler
     private class DriverInRaceResults
     {
         [BsonElement("playerId")]
-        public string PlayerId { get; set; }
+        public string? PlayerId { get; set; }
 
         [BsonElement("bestLap")]
         public int BestLap { get; set; }
@@ -340,10 +340,10 @@ internal class ResultsHandler
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [BsonElement("drivers")]
-        public Driver[] Drivers { get; set; }
+        public Driver[]? Drivers { get; set; }
 
         [BsonElement("raceNumber")]
         public int RaceNumber { get; set; }
@@ -364,13 +364,13 @@ internal class ResultsHandler
     private class Driver
     {
         [BsonElement("firstName")]
-        public string FirstName { get; set; }
+        public string? FirstName { get; set; }
 
         [BsonElement("lastName")]
-        public string LastName { get; set; }
+        public string? LastName { get; set; }
 
         [BsonElement("shortName")]
-        public string ShortName { get; set; }
+        public string? ShortName { get; set; }
 
         [BsonElement("nationality")]
         public int Nationality { get; set; }
@@ -379,17 +379,17 @@ internal class ResultsHandler
         public int DriverCategory { get; set; }
 
         [BsonElement("playerID")]
-        public string PlayerID { get; set; }
+        public string? PlayerID { get; set; }
     }
 
     private class DriverInChampionshipStandings
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [BsonElement("playerId")]
-        public string PlayerId { get; set; }
+        public string? PlayerId { get; set; }
 
         [BsonElement("points")]
         public int Points { get; set; }
@@ -404,7 +404,7 @@ internal class ResultsHandler
         public class Finish
         {
             [BsonElement("trackName")]
-            public string TrackName { get; set; }
+            public string? TrackName { get; set; }
 
             [BsonElement("finishingPosition")]
             public int FinishingPosition { get; set; }
@@ -417,7 +417,7 @@ internal class ResultsHandler
         }
 
         [BsonElement("finishes")]
-        public Finish[] Finishes { get; set; }
+        public Finish[]? Finishes { get; set; }
 
         [BsonElement("roundDropped")]
         public int RoundDropped { get; set; }
