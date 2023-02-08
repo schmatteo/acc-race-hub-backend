@@ -1,13 +1,15 @@
 using System;
+using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 internal class JsonDeser
 {
-    public static Results Deser(string json)
+    public static async Task<Results> DeserAsync(MemoryStream json)
     {
         try
         {
-            Results? deserialised = JsonSerializer.Deserialize<Results>(json);
+            Results? deserialised = await JsonSerializer.DeserializeAsync<Results>(json);
             if (deserialised != null)
             {
                 return deserialised;
