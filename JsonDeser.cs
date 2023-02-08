@@ -7,7 +7,7 @@ internal class JsonDeser
     {
         try
         {
-            Results deserialised = JsonSerializer.Deserialize<Results>(json);
+            Results? deserialised = JsonSerializer.Deserialize<Results>(json);
             if (deserialised != null)
             {
                 return deserialised;

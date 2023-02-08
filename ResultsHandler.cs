@@ -174,7 +174,7 @@ internal class ResultsHandler
             .Join(entrylist,
                 result => result.CurrentDriver.PlayerId,
                 entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
-                (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId).DriverCategory })
+                (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory })
             .GroupBy(x => x.Class)
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
 
@@ -186,7 +186,7 @@ internal class ResultsHandler
                                                            where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
                                                            select doc;
 
-                DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers[0].PlayerID };
+                DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers?[0].PlayerID };
                 DriverInChampionshipDefinitions updates;
                 BsonDocument documentToInsert = new();
 
@@ -199,7 +199,7 @@ internal class ResultsHandler
                     }
                     else
                     {
-                        int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers[0].DriverCategory], e => e == driverInResults.First());
+                        int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers?[0].DriverCategory], e => e == driverInResults.First());
                         int points = Maps.Points[place];
 
 
@@ -224,7 +224,7 @@ internal class ResultsHandler
                 UpdateOptions options = new() { IsUpsert = true };
                 try
                 {
-                    _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers[0].PlayerID } }, update, options);
+                    _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers?[0].PlayerID } }, update, options);
                 }
                 catch (Exception ex)
                 {
@@ -250,10 +250,10 @@ internal class ResultsHandler
             {
                 foreach (DriverInChampionshipStandings driver in cursor.Current)
                 {
-                    if (driver.Finishes.Length > 1)
+                    if (driver.Finishes?.Length > 1)
                     {
                         IOrderedEnumerable<DriverInChampionshipStandings.Finish> finishesSorted = driver.Finishes.OrderBy(x => x.Points);
-                        DriverInChampionshipStandings.Finish worstFinish = finishesSorted.FirstOrDefault();
+                        DriverInChampionshipStandings.Finish? worstFinish = finishesSorted.FirstOrDefault();
                         int droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
                         int pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points);
 
