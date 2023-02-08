@@ -169,7 +169,7 @@ internal class ResultsHandler
             .Join(entrylist,
                 result => result.CurrentDriver.PlayerId,
                 entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
-                (result, entry) => new { Result = result, Class = (Maps.Classes)entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory })
+                (result, entry) => new { Result = result, Class = (Maps.Classes)(entry.Drivers.FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory ?? 0) })
             .GroupBy(x => x.Class)
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
 
@@ -180,7 +180,7 @@ internal class ResultsHandler
             foreach (EntrylistEntry entry in entrylist)
             {
                 IQueryable<DriverResult> driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
-                                                           where doc.CurrentDriver.PlayerId == entry.Drivers[0].PlayerID
+                                                           where doc.CurrentDriver.PlayerId == entry.Drivers![0].PlayerID
                                                            select doc;
 
                 DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers?[0].PlayerID };
@@ -196,11 +196,11 @@ internal class ResultsHandler
                     }
                     else
                     {
-                        int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)entry.Drivers?[0].DriverCategory], e => e == driverInResults.First());
+                        int place = Array.FindIndex(sortedRaceResults[(Maps.Classes)(entry.Drivers?[0].DriverCategory ?? 0)], e => e == driverInResults.First());
                         int points = Maps.Points[place];
 
 
-                        bool purple = purples[(Maps.Classes)entry.Drivers[0].DriverCategory].CurrentDriver.PlayerId == entry.Drivers[0].PlayerID;
+                        bool purple = purples[(Maps.Classes)(entry.Drivers?[0].DriverCategory ?? 0)].CurrentDriver.PlayerId == entry.Drivers?[0].PlayerID;
                         if (purple)
                         {
                             points += 3;
