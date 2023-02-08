@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 internal class ResultsHandler
 {
     private static readonly string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
+    private static readonly MongoClient client = new(MongoURI);
+    private static readonly IMongoDatabase database = client.GetDatabase("acc_race_hub");
 
     public static void Handle(Results results)
     {
@@ -33,14 +35,8 @@ internal class ResultsHandler
 
     private static async void HandleRaceResults(Results results)
     {
-        MongoClientSettings settings = MongoClientSettings.FromConnectionString(MongoURI);
-        settings.LinqProvider = LinqProvider.V3;
-        MongoClient client = new(settings);
-        IMongoDatabase database = client.GetDatabase("acc_race_hub");
-
         int lapCount = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         int dnfLapCount = (int)(lapCount * 0.9);
-
 
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
@@ -77,11 +73,6 @@ internal class ResultsHandler
 
     private static async void HandleQualifyingResults(Results results)
     {
-        MongoClientSettings settings = MongoClientSettings.FromConnectionString(MongoURI);
-        settings.LinqProvider = LinqProvider.V3;
-        MongoClient client = new(settings);
-        IMongoDatabase database = client.GetDatabase("acc_race_hub");
-
         IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("race_results");
 
         await InsertQualifyingIntoDatabase(collection, results);
