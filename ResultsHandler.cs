@@ -150,18 +150,13 @@ internal class ResultsHandler
         }
 
         UpdateOptions options = new() { IsUpsert = true };
+        List<Task> documentsToInsert = new();
         foreach (KeyValuePair<int, int> item in carPoints)
         {
-            try
-            {
-                UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
-                _ = await collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error updating manufacturers standings {ex.Message}");
-            }
+            UpdateDefinition<BsonDocument> pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
+            documentsToInsert.Add(collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options));
         }
+        await Task.WhenAll(documentsToInsert);
     }
 
     private static async Task UpdateIndividualResultsAsync(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
@@ -179,6 +174,8 @@ internal class ResultsHandler
             .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
 
             Dictionary<Maps.Classes, DriverResult> purples = GetFastestLap(sortedRaceResults);
+
+            List<Task> documentsToInsert = new();
 
             foreach (EntrylistEntry entry in entrylist)
             {
@@ -222,15 +219,9 @@ internal class ResultsHandler
                 );
 
                 UpdateOptions options = new() { IsUpsert = true };
-                try
-                {
-                    _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers?[0].PlayerID } }, update, options);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error inserting driver result into database {ex.Message}");
-                }
+                documentsToInsert.Add(collection.UpdateOneAsync(new BsonDocument { { "playerId", entry.Drivers?[0].PlayerID } }, update, options));
             }
+            await Task.WhenAll(documentsToInsert);
         }
         catch (Exception ex)
         {
@@ -248,6 +239,7 @@ internal class ResultsHandler
         {
             while (cursor.MoveNext())
             {
+                List<Task> documentsToInsert = new();
                 foreach (DriverInChampionshipStandings driver in cursor.Current)
                 {
                     if (driver.Finishes?.Length > 1)
@@ -260,16 +252,10 @@ internal class ResultsHandler
                         DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
 
                         UpdateDefinition<DriverInChampionshipStandings> query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
-                        try
-                        {
-                            _ = await collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.Error.WriteLine($"Error calculating drop round {ex.Message}");
-                        }
+                        documentsToInsert.Add(collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query));
                     }
                 }
+                await Task.WhenAll(documentsToInsert);
             }
         }
         finally
