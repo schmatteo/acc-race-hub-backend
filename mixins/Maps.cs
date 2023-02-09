@@ -2,25 +2,6 @@ using System.Collections.Generic;
 
 internal class Maps
 {
-    //public static Dictionary<int, int> Points = new()
-    //{
-    //    { 1, 50 },
-    //    { 2, 45 },
-    //    { 3, 40 },
-    //    { 4, 35 },
-    //    { 5, 30 },
-    //    { 6, 25 },
-    //    { 7, 22 },
-    //    { 8, 19 },
-    //    { 9, 16 },
-    //    { 10, 13 },
-    //    { 11, 10 },
-    //    { 12, 8 },
-    //    { 13, 6 },
-    //    { 14, 4 },
-    //    { 15, 2 }
-    //};
-
     public static int[] Points = new int[] { 50, 45, 40, 35, 30, 25, 22, 19, 16, 13, 10, 8, 6, 4, 2 };
 
     public static Dictionary<int, string> Cars = new()
