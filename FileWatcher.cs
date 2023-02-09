@@ -19,11 +19,11 @@ internal class FileWatcher
     }
 
 
-    private static async void OnCreated(object sender, FileSystemEventArgs e, Action<Results> callback)
+    private static async void OnCreated(object _sender, FileSystemEventArgs e, Action<Results> callback)
     {
         var text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
         byte[] byteArray = Encoding.UTF8.GetBytes(text);
-        MemoryStream stream = new MemoryStream(byteArray);
+        MemoryStream stream = new(byteArray);
         callback(await JsonDeser.DeserAsync(stream));
     }
 

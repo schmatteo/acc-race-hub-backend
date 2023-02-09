@@ -66,6 +66,7 @@ internal class ResultsHandler
             await finishedTask;
             _ = tasks.Remove(finishedTask);
         }
+
         UpdateDropRound(driversCollection);
         Console.WriteLine("Updated drop rounds");
         // TODO: add teams points handling
@@ -75,9 +76,12 @@ internal class ResultsHandler
     {
         IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("race_results");
 
-        await InsertQualifyingIntoDatabase(collection, results);
+        await InsertQualifyingIntoDatabaseAsync(collection, results);
         Console.WriteLine("Inserted qualifying results into the database");
     }
+
+
+    // Race results related tasks
 
     private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<BsonDocument> collection, Results results)
     {
@@ -255,7 +259,24 @@ internal class ResultsHandler
         }
     }
 
-    private static async Task InsertQualifyingIntoDatabase(IMongoCollection<BsonDocument> collection, Results results)
+    private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
+    {
+        Dictionary<Maps.Classes, DriverResult> fastest = new();
+        foreach (KeyValuePair<Maps.Classes, DriverResult[]> entry in results)
+        {
+            int purple = entry.Value.Min(x => x.Timing.BestLap);
+            IEnumerable<DriverResult> holder = from doc in entry.Value
+                                               where doc.Timing.BestLap == purple
+                                               select doc;
+            fastest.Add(entry.Key, holder.First());
+        }
+        return fastest;
+    }
+
+
+    // Qualifying results related tasks
+
+    private static async Task InsertQualifyingIntoDatabaseAsync(IMongoCollection<BsonDocument> collection, Results results)
     {
         BsonArray resultsToInsert = new();
         foreach (DriverResult driver in results.SessionResult.LeaderBoardLines)
@@ -283,20 +304,8 @@ internal class ResultsHandler
         }
     }
 
-    private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(Dictionary<Maps.Classes, DriverResult[]> results)
-    {
-        Dictionary<Maps.Classes, DriverResult> fastest = new();
-        foreach (KeyValuePair<Maps.Classes, DriverResult[]> entry in results)
-        {
-            int purple = entry.Value.Min(x => x.Timing.BestLap);
-            IEnumerable<DriverResult> holder = from doc in entry.Value
-                                               where doc.Timing.BestLap == purple
-                                               select doc;
-            fastest.Add(entry.Key, holder.First());
-        }
-        return fastest;
-    }
 
+    // Types
 
     private class DriverInRaceResults
     {
