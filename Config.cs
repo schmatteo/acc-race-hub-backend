@@ -35,15 +35,7 @@ class Config
         }
         else
         {
-            try
-            {
-                File.Create(path);
-                return new Config();
-            }
-            catch (Exception)
-            {
-                throw new Exception("Cannot create a config file");
-            }
+            return new Config();
         }
         throw new Exception("Cannot read config");
     }

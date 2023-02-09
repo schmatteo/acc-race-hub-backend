@@ -8,22 +8,23 @@ internal class Program
     public static async Task Main(string[] args)
     {
         var configDir = $"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/acc-race-hub-config.json";
-        await CommandLine.HandleArgsAsync(args, async (url) =>
+        await CommandLine.HandleArgsAsync(args, async (argsUrl) =>
         {
             var cfg = await Config.ReadConfig(configDir);
-            // need to handle a situation where both command line and file urls are null
             if (cfg.MongoUrl is not null) mongoUrl = cfg.MongoUrl;
-            Console.WriteLine($"URL from the config: {cfg.MongoUrl}");
-            if (url is null)
+            if (argsUrl is not null)
             {
-                Console.WriteLine("No URL in args");
+                MongoUrl formattedUrl = new(argsUrl);
+                mongoUrl = formattedUrl;
+                cfg.SetMongoUrl(formattedUrl);
+                await Config.WriteToConfig(configDir, cfg);
             }
             else
             {
-                MongoUrl formattedUrl = new(@url);
-                cfg.SetMongoUrl(formattedUrl);
-                await Config.WriteToConfig(configDir, cfg);
-                Console.WriteLine($"URL from command line: {cfg.MongoUrl}");
+                if (cfg.MongoUrl is null)
+                {
+                    throw new Exception("No MongoDB URL. Try running the app with --mongourl <url> flag");
+                }
             }
         });
 
