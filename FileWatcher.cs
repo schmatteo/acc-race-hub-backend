@@ -26,16 +26,4 @@ internal class FileWatcher
         MemoryStream stream = new(byteArray);
         callback(await JsonDeser.DeserResultsAsync(stream));
     }
-
-    private static void PrintException(Exception? ex)
-    {
-        if (ex != null)
-        {
-            Console.WriteLine($"Message: {ex.Message}");
-            Console.WriteLine("Stacktrace:");
-            Console.WriteLine(ex.StackTrace);
-            Console.WriteLine();
-            PrintException(ex.InnerException);
-        }
-    }
 }
