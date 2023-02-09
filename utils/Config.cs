@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-class Config
+internal class Config
 {
     [JsonRequired]
     [JsonPropertyName("mongoUrl")]
@@ -25,11 +25,11 @@ class Config
     {
         if (File.Exists(path))
         {
-            var text = await File.ReadAllTextAsync(path);
+            string text = await File.ReadAllTextAsync(path);
             byte[] byteArray = Encoding.UTF8.GetBytes(text);
             MemoryStream stream = new(byteArray);
 
-            var cfg = await JsonDeser.DeserConfigAsync(stream);
+            Config cfg = await JsonDeser.DeserConfigAsync(stream);
 
             return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out MongoUrl? url) ? new Config() { MongoUrl = url } : cfg;
         }

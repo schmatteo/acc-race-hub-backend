@@ -8,11 +8,15 @@ internal class Program
     public static async Task Main(string[] args)
     {
         // Load config. If program is ran with --mongourl flag, given url overwrites the one that's in the config
-        var configDir = $"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/acc-race-hub-config.json";
-        await CommandLine.HandleArgsAsync(args, async (argsUrl) =>
+        string configDir = $"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/acc-race-hub-config.json";
+        _ = await CommandLine.HandleArgsAsync(args, async (argsUrl) =>
         {
-            var cfg = await Config.ReadConfig(configDir);
-            if (cfg.MongoUrl is not null) mongoUrl = cfg.MongoUrl;
+            Config cfg = await Config.ReadConfig(configDir);
+            if (cfg.MongoUrl is not null)
+            {
+                mongoUrl = cfg.MongoUrl;
+            }
+
             if (argsUrl is not null)
             {
                 MongoUrl formattedUrl = new(argsUrl);

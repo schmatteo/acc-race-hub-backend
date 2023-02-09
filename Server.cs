@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 internal class HttpServer
 {
-    private static HttpListener listener;
+    private static HttpListener? listener;
     private static readonly List<string> urls = new() { "http://localhost:4001/", "http://127.0.0.1:4001/" };
     private static string pageData = "";
     private static bool runServer = true;
