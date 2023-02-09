@@ -10,14 +10,21 @@ internal class Program
         var configDir = $"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/acc-race-hub-config.json";
         await CommandLine.HandleArgsAsync(args, async (url) =>
         {
+            var cfg = await Config.ReadConfig(configDir);
+            // need to handle a situation where both command line and file urls are null
+            if (cfg.MongoUrl is not null) mongoUrl = cfg.MongoUrl;
+            Console.WriteLine($"URL from the config: {cfg.MongoUrl}");
             if (url is null)
             {
                 Console.WriteLine("No URL in args");
             }
-            // save the string that returned into the config and load it 
-            var cfg = await Config.ReadConfig(configDir);
-            if (cfg.MongoUrl is not null) mongoUrl = cfg.MongoUrl;
-            Console.WriteLine($"real: {cfg.MongoUrl}");
+            else
+            {
+                MongoUrl formattedUrl = new(@url);
+                cfg.SetMongoUrl(formattedUrl);
+                await Config.WriteToConfig(configDir, cfg);
+                Console.WriteLine($"URL from command line: {cfg.MongoUrl}");
+            }
         });
 
         Parallel.Invoke(

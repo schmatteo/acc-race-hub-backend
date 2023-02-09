@@ -53,7 +53,7 @@ internal class HttpServer
             res.ContentEncoding = Encoding.UTF8;
             res.ContentLength64 = data.LongLength;
 
-            await res.OutputStream.WriteAsync(data, 0, data.Length);
+            await res.OutputStream.WriteAsync(data);
             res.Close();
         }
 

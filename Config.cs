@@ -2,18 +2,24 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
 class Config
 {
     [JsonRequired]
     [JsonPropertyName("mongoUrl")]
-    public string MongoDeserialisedUrl { get; init; } = "";
+    public string MongoDeserialisedUrl { get; set; } = "";
 
     [JsonIgnore]
-    public MongoUrl? MongoUrl { get; init; } = null;
+    public MongoUrl? MongoUrl { get; private set; } = null;
+
+    public void SetMongoUrl(MongoUrl url)
+    {
+        MongoUrl = url;
+        MongoDeserialisedUrl = url.ToString();
+    }
 
     public static async Task<Config> ReadConfig(string path)
     {
@@ -32,6 +38,7 @@ class Config
             try
             {
                 File.Create(path);
+                return new Config();
             }
             catch (Exception)
             {
@@ -41,10 +48,13 @@ class Config
         throw new Exception("Cannot read config");
     }
 
-    //public static async Task WriteToConfig(string path, Config config)
-    //{
-
-    //}
+    public static async Task WriteToConfig(string path, Config config)
+    {
+        MemoryStream stream = new();
+        await JsonSerializer.SerializeAsync(stream, config);
+        string stringToWrite = Encoding.UTF8.GetString(stream.ToArray());
+        await File.WriteAllTextAsync(path, stringToWrite);
+    }
 
     // If string is a valid MongoUrl, return callback with string that was passed to the function, if it's not valid return callback with null
     public static void TryParseMongoUrl(string url, Action<string?> callback)
