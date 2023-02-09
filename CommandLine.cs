@@ -9,7 +9,7 @@ class CommandLine
     {
         var mongoUrlOption = new Option<string>(
             name: "--mongourl",
-            description: "Connection string of your MongoDB database"
+            description: "Connection string of your MongoDB database. If one is already present in the config file, this will overwrite it."
         );
         var rootCommand = new RootCommand("Backend for github.com/schmatteo/acc-race-hub");
 
