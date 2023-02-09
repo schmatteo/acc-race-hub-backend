@@ -7,6 +7,7 @@ internal class Program
     private static MongoUrl? mongoUrl;
     public static async Task Main(string[] args)
     {
+        // Load config. If program is ran with --mongourl flag, given url overwrites the one that's in the config
         var configDir = $"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}/acc-race-hub-config.json";
         await CommandLine.HandleArgsAsync(args, async (argsUrl) =>
         {
@@ -32,12 +33,19 @@ internal class Program
             HttpServer.Run,
             () => FileWatcher.Watch("../../..", results =>
             {
-                if ((results?.TrackName) == null)
+                if (results?.TrackName is null)
                 {
                     return;
                 }
 
-                ResultsHandler.Handle(results, mongoUrl);
+                if (mongoUrl is not null)
+                {
+                    ResultsHandler.Handle(results, mongoUrl);
+                }
+                else
+                {
+                    Console.Error.WriteLine("Cannot process results file. MongoDB URL is null. Try closing the application and reopening it with --mongourl flag");
+                }
             })
         );
     }
