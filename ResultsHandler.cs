@@ -10,19 +10,17 @@ using System.Threading.Tasks;
 
 internal class ResultsHandler
 {
-    private static readonly string MongoURI = ConfigurationManager.AppSettings.Get("MongoURI") ?? "";
-    private static readonly MongoClient client = new(MongoURI);
-    private static readonly IMongoDatabase database = client.GetDatabase("acc_race_hub");
-
-    public static void Handle(Results results)
+    public static void Handle(Results results, MongoUrl mongoUrl)
     {
+        MongoClient client = new(mongoUrl);
+        IMongoDatabase database = client.GetDatabase("acc_race_hub");
         switch (results?.SessionType)
         {
             case "Q":
-                ResultsHandler.HandleQualifyingResults(results);
+                ResultsHandler.HandleQualifyingResults(results, database);
                 break;
             case "R":
-                ResultsHandler.HandleRaceResults(results);
+                ResultsHandler.HandleRaceResults(results, database);
                 break;
             case "FP":
                 System.Console.Error.WriteLine("Practice session results handling is not currently supported");
@@ -33,7 +31,7 @@ internal class ResultsHandler
         }
     }
 
-    private static async void HandleRaceResults(Results results)
+    private static async void HandleRaceResults(Results results, IMongoDatabase database)
     {
         int lapCount = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         int dnfLapCount = (int)(lapCount * 0.9);
@@ -72,7 +70,7 @@ internal class ResultsHandler
         // TODO: add teams points handling
     }
 
-    private static async void HandleQualifyingResults(Results results)
+    private static async void HandleQualifyingResults(Results results, IMongoDatabase database)
     {
         IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("race_results");
 

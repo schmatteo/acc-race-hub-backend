@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 internal class JsonDeser
 {
-    public static async Task<Results> DeserAsync(MemoryStream json)
+    public static async Task<Results> DeserResultsAsync(MemoryStream json)
     {
         try
         {
@@ -19,6 +19,23 @@ internal class JsonDeser
         {
             Console.Error.WriteLine($"Error reading JSON {e}");
         }
-        return new Results();
+        throw new JsonException("Invalid results JSON");
+    }
+
+    public static async Task<Config> DeserConfigAsync(MemoryStream json)
+    {
+        try
+        {
+            Config? deserialised = await JsonSerializer.DeserializeAsync<Config>(json);
+            if (deserialised != null)
+            {
+                return deserialised;
+            }
+        }
+        catch (JsonException e)
+        {
+            Console.Error.WriteLine($"Error reading JSON {e}");
+        }
+        throw new JsonException("Error reading config");
     }
 }

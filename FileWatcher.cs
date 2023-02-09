@@ -24,7 +24,7 @@ internal class FileWatcher
         var text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
         byte[] byteArray = Encoding.UTF8.GetBytes(text);
         MemoryStream stream = new(byteArray);
-        callback(await JsonDeser.DeserAsync(stream));
+        callback(await JsonDeser.DeserResultsAsync(stream));
     }
 
     private static void PrintException(Exception? ex)
