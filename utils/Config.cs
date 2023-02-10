@@ -49,7 +49,7 @@ internal class Config
     }
 
     // If string is a valid MongoUrl, return callback with string that was passed to the function, if it's not valid return callback with null
-    public static void TryParseMongoUrl(string url, Action<string?> callback)
+    public static void TryParseMongoUrl(in string url, Action<string?> callback)
     {
         try
         {
@@ -68,7 +68,7 @@ internal class Config
     }
 
     // When this method returns, mongoUrl parameter contains the result of parsing or null on failure
-    public static bool TryParseMongoUrl(string url, out MongoUrl? mongoUrl)
+    public static bool TryParseMongoUrl(in string url, out MongoUrl? mongoUrl)
     {
         try
         {
