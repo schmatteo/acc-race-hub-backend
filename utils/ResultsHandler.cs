@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using static DatabaseTypes;
 
 internal class ResultsHandler
 {
@@ -38,9 +37,8 @@ internal class ResultsHandler
 
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
-        IMongoCollection<DatabaseTypes.DriversCollection> driversCollection = database.GetCollection<DatabaseTypes.DriversCollection>("drivers_standings");
-        IMongoCollection<DatabaseTypes.EntrylistCollection> entrylistCollection = database.GetCollection<DatabaseTypes.EntrylistCollection>("entrylist");
-        IMongoCollection<DatabaseTypes.TeamsCollection> teamsCollection = database.GetCollection<DatabaseTypes.TeamsCollection>("teams");
+        IMongoCollection<DatabaseTypes.DriverInChampionshipStandings> driversCollection = database.GetCollection<DatabaseTypes.DriverInChampionshipStandings>("drivers_standings");
+        IMongoCollection<DatabaseTypes.EntrylistEntry> entrylistCollection = database.GetCollection<DatabaseTypes.EntrylistEntry>("entrylist");
 
         Task insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
         Task updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
