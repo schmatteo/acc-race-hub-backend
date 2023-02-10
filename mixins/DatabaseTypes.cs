@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 internal class DatabaseTypes
 {
-    public class EntrylistEntry
+    public class EntrylistCollection
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
@@ -49,7 +49,7 @@ internal class DatabaseTypes
         [BsonElement("playerID")]
         public string? PlayerID { get; set; }
     }
-    public class DriverInChampionshipStandings
+    public class DriversCollection
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
@@ -88,5 +88,26 @@ internal class DatabaseTypes
 
         [BsonElement("roundDropped")]
         public int RoundDropped { get; set; }
+    }
+    public class TeamsCollection
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? Id { get; set; }
+
+        [BsonElement("team")]
+        public string? TeamName { get; set; }
+
+        [BsonElement("drivers")]
+        public string[] Drivers { get; set; } = new string[2];
+
+        [BsonElement("class")]
+        public Maps.Classes? Class { get; set; }
+
+        [BsonElement("points")]
+        public int Points { get; set; }
+
+        [BsonElement("pointsWDrop")]
+        public int PointsWithDrop { get; set; }
     }
 }
