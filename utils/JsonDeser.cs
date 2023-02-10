@@ -5,37 +5,20 @@ using System.Threading.Tasks;
 
 internal class JsonDeser
 {
-    public static async Task<Results> DeserResultsAsync(MemoryStream json)
+    public static async Task<T> DeserAsync<T>(MemoryStream json)
     {
         try
         {
-            Results? deserialised = await JsonSerializer.DeserializeAsync<Results>(json);
-            if (deserialised != null)
+            T? deserialised = await JsonSerializer.DeserializeAsync<T>(json);
+            if (deserialised is not null)
             {
                 return deserialised;
             }
         }
         catch (JsonException e)
         {
-            Console.Error.WriteLine($"Error reading JSON {e}");
+            Console.Error.WriteLine($"Error reading JSON {e.Message}");
         }
-        throw new JsonException("Invalid results JSON");
-    }
-
-    public static async Task<Config> DeserConfigAsync(MemoryStream json)
-    {
-        try
-        {
-            Config? deserialised = await JsonSerializer.DeserializeAsync<Config>(json);
-            if (deserialised != null)
-            {
-                return deserialised;
-            }
-        }
-        catch (JsonException e)
-        {
-            Console.Error.WriteLine($"Error reading JSON {e}");
-        }
-        throw new JsonException("Error reading config");
+        throw new JsonException("Cannot deserialise JSON");
     }
 }

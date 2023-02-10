@@ -24,6 +24,6 @@ internal class FileWatcher
         string text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
         byte[] byteArray = Encoding.UTF8.GetBytes(text);
         MemoryStream stream = new(byteArray);
-        callback(await JsonDeser.DeserResultsAsync(stream));
+        callback(await JsonDeser.DeserAsync<Results>(stream));
     }
 }

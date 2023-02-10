@@ -29,7 +29,7 @@ internal class Config
             byte[] byteArray = Encoding.UTF8.GetBytes(text);
             MemoryStream stream = new(byteArray);
 
-            Config cfg = await JsonDeser.DeserConfigAsync(stream);
+            Config cfg = await JsonDeser.DeserAsync<Config>(stream);
 
             return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out MongoUrl? url) ? new Config() { MongoUrl = url } : cfg;
         }
