@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using static DatabaseTypes;
 
 internal class ResultsHandler
 {
@@ -37,8 +38,8 @@ internal class ResultsHandler
 
         IMongoCollection<BsonDocument> raceCollection = database.GetCollection<BsonDocument>("race_results");
         IMongoCollection<BsonDocument> manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
-        IMongoCollection<DatabaseTypes.DriverInChampionshipStandings> driversCollection = database.GetCollection<DatabaseTypes.DriverInChampionshipStandings>("drivers_standings");
-        IMongoCollection<DatabaseTypes.EntrylistEntry> entrylistCollection = database.GetCollection<DatabaseTypes.EntrylistEntry>("entrylist");
+        IMongoCollection<DriverInChampionshipStandings> driversCollection = database.GetCollection<DriverInChampionshipStandings>("drivers_standings");
+        IMongoCollection<EntrylistEntry> entrylistCollection = database.GetCollection<EntrylistEntry>("entrylist");
 
         Task insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
         Task updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
@@ -151,11 +152,11 @@ internal class ResultsHandler
         await Task.WhenAll(documentsToInsert);
     }
 
-    private static async Task UpdateIndividualResultsAsync(IMongoCollection<DatabaseTypes.DriverInChampionshipStandings> collection, IMongoCollection<DatabaseTypes.EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
+    private static async Task UpdateIndividualResultsAsync(IMongoCollection<DriverInChampionshipStandings> collection, IMongoCollection<EntrylistEntry> entrylistCollection, Results results, int dnfLapCount)
     {
         try
         {
-            List<DatabaseTypes.EntrylistEntry> entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
+            List<EntrylistEntry> entrylist = await entrylistCollection.Find(_ => true).ToListAsync();
 
             Dictionary<Maps.Classes, DriverResult[]> sortedRaceResults = results.SessionResult.LeaderBoardLines
             .Join(entrylist,
@@ -169,13 +170,13 @@ internal class ResultsHandler
 
             List<Task> documentsToInsert = new();
 
-            foreach (DatabaseTypes.EntrylistEntry entry in entrylist)
+            foreach (EntrylistEntry entry in entrylist)
             {
                 IQueryable<DriverResult> driverInResults = from doc in results.SessionResult.LeaderBoardLines.AsQueryable()
                                                            where doc.CurrentDriver.PlayerId == entry.Drivers![0].PlayerID
                                                            select doc;
 
-                DatabaseTypes.DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers?[0].PlayerID };
+                DriverInChampionshipStandings driverToInsert = new() { PlayerId = entry.Drivers?[0].PlayerID };
                 DriverInChampionshipDefinitions updates;
                 BsonDocument documentToInsert = new();
 
@@ -206,7 +207,7 @@ internal class ResultsHandler
                     updates = new(0, -1, false, results.TrackName);
                 }
 
-                UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> update = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Combine(
+                UpdateDefinition<DriverInChampionshipStandings> update = Builders<DriverInChampionshipStandings>.Update.Combine(
                     updates.PointsDefinition, updates.FinishesDefinition
                 );
 
@@ -223,27 +224,27 @@ internal class ResultsHandler
 
     }
 
-    private static async void UpdateDropRound(IMongoCollection<DatabaseTypes.DriverInChampionshipStandings> collection)
+    private static async void UpdateDropRound(IMongoCollection<DriverInChampionshipStandings> collection)
     {
-        IAsyncCursor<DatabaseTypes.DriverInChampionshipStandings> cursor = await collection.Find(_ => true).ToCursorAsync();
+        IAsyncCursor<DriverInChampionshipStandings> cursor = await collection.Find(_ => true).ToCursorAsync();
 
         try
         {
             while (cursor.MoveNext())
             {
                 List<Task> documentsToInsert = new();
-                foreach (DatabaseTypes.DriverInChampionshipStandings driver in cursor.Current)
+                foreach (DriverInChampionshipStandings driver in cursor.Current)
                 {
                     if (driver.Finishes?.Length > 1)
                     {
-                        IOrderedEnumerable<DatabaseTypes.DriverInChampionshipStandings.Finish> finishesSorted = driver.Finishes.OrderBy(x => x.Points);
-                        DatabaseTypes.DriverInChampionshipStandings.Finish? worstFinish = finishesSorted.FirstOrDefault();
+                        IOrderedEnumerable<DriverInChampionshipStandings.Finish> finishesSorted = driver.Finishes.OrderBy(x => x.Points);
+                        DriverInChampionshipStandings.Finish? worstFinish = finishesSorted.FirstOrDefault();
                         int droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
                         int pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points);
 
                         DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
 
-                        UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> query = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
+                        UpdateDefinition<DriverInChampionshipStandings> query = Builders<DriverInChampionshipStandings>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop);
                         documentsToInsert.Add(collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query));
                     }
                 }
@@ -321,25 +322,25 @@ internal class ResultsHandler
 
     private class DriverInChampionshipDefinitions
     {
-        public UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> PointsDefinition { get; }
-        public UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> FinishesDefinition { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> PointsDefinition { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> FinishesDefinition { get; }
 
         public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)
         {
-            PointsDefinition = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Inc("points", points);
-            DatabaseTypes.DriverInChampionshipStandings.Finish finishToPush = new() { TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points };
-            FinishesDefinition = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Push("finishes", finishToPush.ToBsonDocument());
+            PointsDefinition = Builders<DriverInChampionshipStandings>.Update.Inc("points", points);
+            DriverInChampionshipStandings.Finish finishToPush = new() { TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points };
+            FinishesDefinition = Builders<DriverInChampionshipStandings>.Update.Push("finishes", finishToPush.ToBsonDocument());
         }
     }
 
     private class DropRoundDefinitions
     {
-        public UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> DropRoundIndex { get; }
-        public UpdateDefinition<DatabaseTypes.DriverInChampionshipStandings> PointsWithDrop { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> DropRoundIndex { get; }
+        public UpdateDefinition<DriverInChampionshipStandings> PointsWithDrop { get; }
         public DropRoundDefinitions(int dropRoundIndex, int pointsWithDrop)
         {
-            DropRoundIndex = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Set("roundDropped", dropRoundIndex);
-            PointsWithDrop = Builders<DatabaseTypes.DriverInChampionshipStandings>.Update.Set("pointsWDrop", pointsWithDrop);
+            DropRoundIndex = Builders<DriverInChampionshipStandings>.Update.Set("roundDropped", dropRoundIndex);
+            PointsWithDrop = Builders<DriverInChampionshipStandings>.Update.Set("pointsWDrop", pointsWithDrop);
         }
     }
 
