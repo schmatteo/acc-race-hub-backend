@@ -6,7 +6,7 @@ internal class FileWatcher
 {
     public static void Watch(string path, Action<Results> callback)
     {
-        using FileSystemWatcher watcher = new(@path);
+        using FileSystemWatcher watcher = new(path);
 
         watcher.NotifyFilter = NotifyFilters.FileName;
 
@@ -21,8 +21,8 @@ internal class FileWatcher
 
     private static async void OnCreated(object _sender, FileSystemEventArgs e, Action<Results> callback)
     {
-        string text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
-        byte[] byteArray = Encoding.UTF8.GetBytes(text);
+        var text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
+        var byteArray = Encoding.UTF8.GetBytes(text);
         MemoryStream stream = new(byteArray);
         callback(await JsonDeser.DeserAsync<Results>(stream));
     }

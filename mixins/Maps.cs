@@ -2,11 +2,18 @@ using System.Collections.Generic;
 
 internal class Maps
 {
-    public static int[] Points = new int[] { 50, 45, 40, 35, 30, 25, 22, 19, 16, 13, 10, 8, 6, 4, 2 };
+    public enum Classes
+    {
+        pro = 3,
+        silver = 1,
+        am = 0
+    }
+
+    public static int[] Points = { 50, 45, 40, 35, 30, 25, 22, 19, 16, 13, 10, 8, 6, 4, 2 };
 
     public static Dictionary<int, string> Cars = new()
     {
-        { 0, "Porsche 911 GT3 R"},
+        { 0, "Porsche 911 GT3 R" },
         { 1, "Mercedes-AMG GT3" },
         { 2, "Ferrari 488 GT3" },
         { 3, "Audi R8 LMS GT3" },
@@ -46,11 +53,4 @@ internal class Maps
         { 60, "Mercedes AMG GT4" },
         { 61, "Porsche 718 Cayman GT4 Clubsport" }
     };
-
-    public enum Classes
-    {
-        pro = 3,
-        silver = 1,
-        am = 0
-    }
 }

@@ -1,19 +1,18 @@
-﻿using MongoDB.Driver;
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using MongoDB.Driver;
 
 internal class Config
 {
     [JsonRequired]
     [JsonPropertyName("mongoUrl")]
-    public string MongoDeserialisedUrl { get; set; } = "";
+    private string MongoDeserialisedUrl { get; set; } = "";
 
-    [JsonIgnore]
-    public MongoUrl? MongoUrl { get; private set; } = null;
+    [JsonIgnore] public MongoUrl? MongoUrl { get; private set; }
 
     public void SetMongoUrl(MongoUrl url)
     {
@@ -25,26 +24,23 @@ internal class Config
     {
         if (File.Exists(path))
         {
-            string text = await File.ReadAllTextAsync(path);
-            byte[] byteArray = Encoding.UTF8.GetBytes(text);
+            var text = await File.ReadAllTextAsync(path);
+            var byteArray = Encoding.UTF8.GetBytes(text);
             MemoryStream stream = new(byteArray);
 
-            Config cfg = await JsonDeser.DeserAsync<Config>(stream);
+            var cfg = await JsonDeser.DeserAsync<Config>(stream);
 
-            return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out MongoUrl? url) ? new Config() { MongoUrl = url } : cfg;
+            return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out var url) ? new Config { MongoUrl = url } : cfg;
         }
-        else
-        {
-            return new Config();
-        }
-        throw new Exception("Cannot read config");
+
+        return new Config();
     }
 
     public static async Task WriteToConfig(string path, Config config)
     {
         MemoryStream stream = new();
         await JsonSerializer.SerializeAsync(stream, config);
-        string stringToWrite = Encoding.UTF8.GetString(stream.ToArray());
+        var stringToWrite = Encoding.UTF8.GetString(stream.ToArray());
         await File.WriteAllTextAsync(path, stringToWrite);
     }
 
@@ -53,7 +49,7 @@ internal class Config
     {
         try
         {
-            _ = new MongoUrl(@url);
+            _ = new MongoUrl(url);
             callback(url);
         }
         catch (MongoConfigurationException)
@@ -72,7 +68,7 @@ internal class Config
     {
         try
         {
-            mongoUrl = new MongoUrl(@url);
+            mongoUrl = new MongoUrl(url);
             return true;
         }
         catch (Exception)
@@ -81,6 +77,4 @@ internal class Config
             return false;
         }
     }
-
 }
-

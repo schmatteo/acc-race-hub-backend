@@ -15,10 +15,10 @@ internal class HttpServer
     {
         while (runServer)
         {
-            HttpListenerContext ctx = await listener!.GetContextAsync();
+            var ctx = await listener!.GetContextAsync();
 
-            HttpListenerRequest req = ctx.Request;
-            HttpListenerResponse res = ctx.Response;
+            var req = ctx.Request;
+            var res = ctx.Response;
 
             Console.WriteLine(req.HttpMethod);
             Console.WriteLine(req.UserHostName);
@@ -43,12 +43,10 @@ internal class HttpServer
                 case "/raceresults":
                     GetData(DataTypes.RaceResults);
                     break;
-                default:
-                    break;
             }
 
             pageData = req.Url?.AbsolutePath;
-            byte[] data = Encoding.UTF8.GetBytes(pageData ?? "");
+            var data = Encoding.UTF8.GetBytes(pageData ?? "");
             res.ContentType = "application/json";
             res.ContentEncoding = Encoding.UTF8;
             res.ContentLength64 = data.LongLength;
@@ -56,7 +54,6 @@ internal class HttpServer
             await res.OutputStream.WriteAsync(data);
             res.Close();
         }
-
     }
 
     private static void GetData(DataTypes type)
@@ -87,20 +84,24 @@ internal class HttpServer
     public static void Run()
     {
         listener = new HttpListener();
-        foreach (string url in urls)
+        foreach (var url in urls)
         {
             listener.Prefixes.Add(url);
             Console.WriteLine($"Listening on {url}");
         }
+
         listener.Start();
 
-        Task listenTask = HandleIncomingConnections();
+        var listenTask = HandleIncomingConnections();
         listenTask.GetAwaiter().GetResult();
 
         listener.Close();
     }
 
-    public static void Stop() { runServer = false; }
+    public static void Stop()
+    {
+        runServer = false;
+    }
 
     private enum DataTypes
     {

@@ -9,16 +9,14 @@ internal class JsonDeser
     {
         try
         {
-            T? deserialised = await JsonSerializer.DeserializeAsync<T>(json);
-            if (deserialised is not null)
-            {
-                return deserialised;
-            }
+            var deserialised = await JsonSerializer.DeserializeAsync<T>(json);
+            if (deserialised is not null) return deserialised;
         }
         catch (JsonException e)
         {
             Console.Error.WriteLine($"Error reading JSON {e.Message}");
         }
+
         throw new JsonException("Cannot deserialise JSON");
     }
 }
