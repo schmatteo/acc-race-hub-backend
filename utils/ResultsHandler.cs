@@ -115,18 +115,16 @@ internal class ResultsHandler
                      (item, index) => (item, index)))
             if (index < 15)
             {
-                if (driver.Timing.LapCount >= dnfLapCount)
+                if (driver.Timing.LapCount < dnfLapCount) continue;
+                var car = driver.Car.CarModel;
+                var points = Maps.Points[index];
+                try
                 {
-                    var car = driver.Car.CarModel;
-                    var points = Maps.Points[index];
-                    try
-                    {
-                        carPoints[car] += points;
-                    }
-                    catch (KeyNotFoundException)
-                    {
-                        carPoints.Add(car, points);
-                    }
+                    carPoints[car] += points;
+                }
+                catch (KeyNotFoundException)
+                {
+                    carPoints.Add(car, points);
                 }
             }
             else
@@ -135,13 +133,11 @@ internal class ResultsHandler
             }
 
         UpdateOptions options = new() { IsUpsert = true };
-        List<Task> documentsToInsert = new();
-        foreach (var item in carPoints)
-        {
-            var pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value);
-            documentsToInsert.Add(collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } },
-                pointsToAdd, options));
-        }
+        List<Task> documentsToInsert = (from item in carPoints 
+            let pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value) 
+            select collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options))
+            .Cast<Task>()
+            .ToList();
 
         await Task.WhenAll(documentsToInsert);
     }
@@ -156,11 +152,13 @@ internal class ResultsHandler
             var sortedRaceResults = results.SessionResult.LeaderBoardLines
                 .Join(entrylist,
                     result => result.CurrentDriver.PlayerId,
-                    entry => entry.Drivers.Select(d => d.PlayerID).FirstOrDefault(),
+                    entry => (entry.Drivers 
+                              ?? throw new InvalidOperationException("Cannot match a driver from entrylist with a driver in race results"))
+                        .Select(d => d.PlayerID).FirstOrDefault(),
                     (result, entry) => new
                     {
                         Result = result,
-                        Class = (Maps.Classes)(entry.Drivers
+                        Class = (Maps.Classes)((entry.Drivers ?? throw new InvalidOperationException("Cannot match a driver from entrylist with a driver in race results"))
                             .FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory ?? 0)
                     })
                 .GroupBy(x => x.Class)
@@ -360,9 +358,9 @@ internal class ResultsHandler
             Laps = laps;
         }
 
-        public string PlayerId { get; }
-        public int BestLap { get; }
-        public int LapCount { get; }
-        public List<int> Laps { get; }
+        private string PlayerId { get; }
+        private int BestLap { get; }
+        private int LapCount { get; }
+        private List<int> Laps { get; }
     }
 }
