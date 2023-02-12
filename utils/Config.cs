@@ -10,7 +10,7 @@ internal class Config
 {
     [JsonRequired]
     [JsonPropertyName("mongoUrl")]
-    private string MongoDeserialisedUrl { get; set; } = "";
+    public string MongoDeserialisedUrl { get; set; } = "";
 
     [JsonIgnore] public MongoUrl? MongoUrl { get; private set; }
 
