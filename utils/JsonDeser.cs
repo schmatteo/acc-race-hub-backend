@@ -14,7 +14,7 @@ internal class JsonDeser
         }
         catch (JsonException e)
         {
-            Console.Error.WriteLine($"Error reading JSON {e.Message}");
+            await Console.Error.WriteLineAsync($"Error reading JSON {e.Message}");
         }
 
         throw new JsonException("Cannot deserialise JSON");

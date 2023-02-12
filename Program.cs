@@ -4,7 +4,7 @@ using MongoDB.Driver;
 
 internal class Program
 {
-    private static MongoUrl? mongoUrl;
+    private static MongoUrl? _mongoUrl;
 
     public static async Task Main(string[] args)
     {
@@ -14,12 +14,12 @@ internal class Program
         _ = await CommandLine.HandleArgsAsync(args, async argsUrl =>
         {
             var cfg = await Config.ReadConfig(configDir);
-            if (cfg.MongoUrl is not null) mongoUrl = cfg.MongoUrl;
+            if (cfg.MongoUrl is not null) _mongoUrl = cfg.MongoUrl;
 
             if (argsUrl is not null)
             {
                 MongoUrl formattedUrl = new(argsUrl);
-                mongoUrl = formattedUrl;
+                _mongoUrl = formattedUrl;
                 cfg.SetMongoUrl(formattedUrl);
                 await Config.WriteToConfig(configDir, cfg);
             }
@@ -36,8 +36,8 @@ internal class Program
             {
                 if (results?.TrackName is null) return;
 
-                if (mongoUrl is not null)
-                    ResultsHandler.Handle(results, mongoUrl);
+                if (_mongoUrl is not null)
+                    ResultsHandler.Handle(results, _mongoUrl);
                 else
                     Console.Error.WriteLine(
                         "Cannot process results file. MongoDB URL is null. Try closing the application and reopening it with --mongourl flag");

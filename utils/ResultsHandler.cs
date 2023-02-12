@@ -103,7 +103,7 @@ internal class ResultsHandler
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error inserting race results into database {ex.Message}");
+            await Console.Error.WriteLineAsync($"Error inserting race results into database {ex.Message}");
         }
     }
 
@@ -111,7 +111,7 @@ internal class ResultsHandler
         Results results, int dnfLapCount)
     {
         Dictionary<int, int> carPoints = new();
-        foreach ((var driver, var index) in results.SessionResult.LeaderBoardLines.Select(
+        foreach (var (driver, index) in results.SessionResult.LeaderBoardLines.Select(
                      (item, index) => (item, index)))
             if (index < 15)
             {
@@ -164,7 +164,7 @@ internal class ResultsHandler
                             .FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory ?? 0)
                     })
                 .GroupBy(x => x.Class)
-                .ToDictionary(x => x.Key, x => x.Select(x => x.Result).ToArray());
+                .ToDictionary(x => x.Key, x => x.Select(r => r.Result).ToArray());
 
             var purples = GetFastestLap(sortedRaceResults);
 
@@ -219,9 +219,13 @@ internal class ResultsHandler
 
             await Task.WhenAll(documentsToInsert);
         }
+        catch (NullReferenceException)
+        {
+            await Console.Error.WriteLineAsync("Entrylist possibly not up to date");
+        }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error fetching entrylist {ex.Message}");
+            await Console.Error.WriteLineAsync($"Error fetching entrylist {ex.Message}");
         }
     }
 
@@ -231,24 +235,19 @@ internal class ResultsHandler
 
         try
         {
-            while (cursor.MoveNext())
+            while (await cursor.MoveNextAsync())
             {
-                List<Task> documentsToInsert = new();
-                foreach (var driver in cursor.Current)
-                    if (driver.Finishes?.Length > 1)
-                    {
-                        var finishesSorted = driver.Finishes.OrderBy(x => x.Points);
-                        var worstFinish = finishesSorted.FirstOrDefault();
-                        var droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish);
-                        var pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points);
-
-                        DropRoundDefinitions updates = new(droppedRound, pointsWithDrop);
-
-                        var query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex,
-                            updates.PointsWithDrop);
-                        documentsToInsert.Add(
-                            collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query));
-                    }
+                var documentsToInsert = (from driver in cursor.Current 
+                    where driver.Finishes?.Length > 1 
+                    let finishesSorted = driver.Finishes.OrderBy(x => x.Points) 
+                    let worstFinish = finishesSorted.FirstOrDefault() 
+                    let droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish) 
+                    let pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points) 
+                    let updates = new DropRoundDefinitions(droppedRound, pointsWithDrop) 
+                    let query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop) 
+                    select collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query))
+                    .Cast<Task>()
+                    .ToList();
 
                 await Task.WhenAll(documentsToInsert);
             }
@@ -305,7 +304,7 @@ internal class ResultsHandler
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error inserting qualifying results into database {ex.Message}");
+            await Console.Error.WriteLineAsync($"Error inserting qualifying results into database {ex.Message}");
         }
     }
 

@@ -6,16 +6,16 @@ using System.Threading.Tasks;
 
 internal class HttpServer
 {
-    private static HttpListener? listener;
-    private static readonly List<string> urls = new() { "http://localhost:4001/", "http://127.0.0.1:4001/" };
-    private static string pageData = "";
-    private static bool runServer = true;
+    private static HttpListener? _listener;
+    private static readonly List<string> Urls = new() { "http://localhost:4001/", "http://127.0.0.1:4001/" };
+    private static string _pageData = "";
+    private static bool _runServer = true;
 
     private static async Task HandleIncomingConnections()
     {
-        while (runServer)
+        while (_runServer)
         {
-            var ctx = await listener!.GetContextAsync();
+            var ctx = await _listener!.GetContextAsync();
 
             var req = ctx.Request;
             var res = ctx.Response;
@@ -45,8 +45,8 @@ internal class HttpServer
                     break;
             }
 
-            pageData = req.Url?.AbsolutePath;
-            var data = Encoding.UTF8.GetBytes(pageData ?? "");
+            _pageData = req.Url?.AbsolutePath;
+            var data = Encoding.UTF8.GetBytes(_pageData ?? "");
             res.ContentType = "application/json";
             res.ContentEncoding = Encoding.UTF8;
             res.ContentLength64 = data.LongLength;
@@ -83,24 +83,24 @@ internal class HttpServer
 
     public static void Run()
     {
-        listener = new HttpListener();
-        foreach (var url in urls)
+        _listener = new HttpListener();
+        foreach (var url in Urls)
         {
-            listener.Prefixes.Add(url);
+            _listener.Prefixes.Add(url);
             Console.WriteLine($"Listening on {url}");
         }
 
-        listener.Start();
+        _listener.Start();
 
         var listenTask = HandleIncomingConnections();
         listenTask.GetAwaiter().GetResult();
 
-        listener.Close();
+        _listener.Close();
     }
 
     public static void Stop()
     {
-        runServer = false;
+        _runServer = false;
     }
 
     private enum DataTypes
