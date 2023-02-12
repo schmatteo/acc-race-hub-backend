@@ -133,7 +133,7 @@ internal class ResultsHandler
             }
 
         UpdateOptions options = new() { IsUpsert = true };
-        List<Task> documentsToInsert = (from item in carPoints 
+        var documentsToInsert = (from item in carPoints 
             let pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value) 
             select collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options))
             .Cast<Task>()
@@ -255,7 +255,7 @@ internal class ResultsHandler
             cursor.Dispose();
         }
     }
-
+    
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(
         Dictionary<Maps.Classes, DriverResult[]> results)
     {

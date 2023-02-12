@@ -22,18 +22,15 @@ internal class Config
 
     public static async Task<Config> ReadConfig(string path)
     {
-        if (File.Exists(path))
-        {
-            var text = await File.ReadAllTextAsync(path);
-            var byteArray = Encoding.UTF8.GetBytes(text);
-            MemoryStream stream = new(byteArray);
+        if (!File.Exists(path)) return new Config();
+        var text = await File.ReadAllTextAsync(path);
+        var byteArray = Encoding.UTF8.GetBytes(text);
+        MemoryStream stream = new(byteArray);
 
-            var cfg = await JsonDeser.DeserAsync<Config>(stream);
+        var cfg = await JsonDeser.DeserAsync<Config>(stream);
 
-            return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out var url) ? new Config { MongoUrl = url } : cfg;
-        }
+        return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out var url) ? new Config { MongoUrl = url } : cfg;
 
-        return new Config();
     }
 
     public static async Task WriteToConfig(string path, Config config)

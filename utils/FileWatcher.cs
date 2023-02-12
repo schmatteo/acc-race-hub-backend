@@ -10,7 +10,7 @@ internal class FileWatcher
 
         watcher.NotifyFilter = NotifyFilters.FileName;
 
-        watcher.Created += (sender, e) => OnCreated(sender, e, callback);
+        watcher.Created += (_, e) => OnCreated(e, callback);
 
         watcher.Filter = "*.json";
         watcher.EnableRaisingEvents = true;
@@ -19,7 +19,7 @@ internal class FileWatcher
     }
 
 
-    private static async void OnCreated(object _sender, FileSystemEventArgs e, Action<Results> callback)
+    private static async void OnCreated(FileSystemEventArgs e, Action<Results> callback)
     {
         var text = await File.ReadAllTextAsync(e.FullPath, Encoding.Unicode);
         var byteArray = Encoding.UTF8.GetBytes(text);
