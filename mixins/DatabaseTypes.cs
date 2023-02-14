@@ -15,7 +15,7 @@ internal class DatabaseTypes
 
         public int RaceNumber { get; set; }
 
-        public int ForcedCarModel { get; set;  }
+        public int ForcedCarModel { get; set; }
 
         public int OverrideDriverInfo { get; set; }
 
@@ -35,6 +35,7 @@ internal class DatabaseTypes
         public int Nationality { get; set; }
 
         public int DriverCategory { get; set; }
+
         // might cause chaos
         public string? PlayerID { get; set; }
     }
@@ -86,7 +87,7 @@ internal class DatabaseTypes
 
         [BsonElement("pointsWDrop")] public int PointsWithDrop { get; set; }
     }
-    
+
     public class DriverInRaceResults
     {
         public string? PlayerId { get; set; }
@@ -103,13 +104,13 @@ internal class DatabaseTypes
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string? Id { get; set; }
-        
+
         public string? Race { get; set; }
-        
+
         public List<DriverInRaceResults>? Results { get; set; }
-        
-        public List<QualifyingResult> QualifyingResults { get; set; }
-        
+
+        public List<QualifyingResult>? QualifyingResults { get; set; }
+
         public string? Track { get; set; }
     }
 
@@ -117,13 +118,13 @@ internal class DatabaseTypes
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
-        
+        public string? Id { get; set; }
+
         public string? Car { get; set; }
-        
+
         public int Points { get; set; }
     }
-    
+
     public class QualifyingResult
     {
         public QualifyingResult(string playerId, int bestLap, int lapCount, List<int> laps)
@@ -136,7 +137,7 @@ internal class DatabaseTypes
 
         public string PlayerId { get; set; }
         public int BestLap { get; set; }
-        public int LapCount { get; set;  }
+        public int LapCount { get; set; }
         public List<int> Laps { get; set; }
     }
 }

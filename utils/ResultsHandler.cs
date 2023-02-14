@@ -13,10 +13,9 @@ internal static class ResultsHandler
     {
         MongoClient client = new(mongoUrl);
         var database = client.GetDatabase("acc_race_hub");
-        var pack = new ConventionPack();
-        pack.Add(new CamelCaseElementNameConvention());
+        var pack = new ConventionPack { new CamelCaseElementNameConvention() };
         ConventionRegistry.Register("camelCase", pack, t => true);
-        
+
         switch (results.SessionType)
         {
             case "Q":
@@ -83,10 +82,13 @@ internal static class ResultsHandler
     {
         // BsonArray resultsToInsert = new();
         var resultsToInsert = results.SessionResult.LeaderBoardLines
-            .Select(driver => new DriverInRaceResults() { PlayerId = driver.CurrentDriver.PlayerId, 
-                BestLap = driver.Timing.BestLap, 
-                LapCount = driver.Timing.LapCount, 
-                TotalTime = driver.Timing.TotalTime })
+            .Select(driver => new DriverInRaceResults
+            {
+                PlayerId = driver.CurrentDriver.PlayerId,
+                BestLap = driver.Timing.BestLap,
+                LapCount = driver.Timing.LapCount,
+                TotalTime = driver.Timing.TotalTime
+            })
             .ToList();
 
         BsonDocument searchString = new()
@@ -94,7 +96,7 @@ internal static class ResultsHandler
             { "race", results.ServerName },
             { "track", results.TrackName }
         };
-        var update = Builders<RaceCollection>.Update.Set<List<DriverInRaceResults>>(x => x.Results, resultsToInsert);
+        var update = Builders<RaceCollection>.Update.Set<List<DriverInRaceResults>>(x => x.Results!, resultsToInsert);
         UpdateOptions options = new() { IsUpsert = true };
 
         try
@@ -317,8 +319,7 @@ internal static class ResultsHandler
 
 
     // Qualifying results related tasks
-
-    // FIXME: qualifying results are not being updated
+ 
     private static async Task InsertQualifyingIntoDatabaseAsync(IMongoCollection<RaceCollection> collection,
         Results results)
     {
@@ -355,7 +356,7 @@ internal static class ResultsHandler
 
 
     // Types
-    
+
     private class DriverInChampionshipDefinitions
     {
         public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)

@@ -30,7 +30,6 @@ internal class Config
         var cfg = await JsonDeser.DeserAsync<Config>(stream);
 
         return TryParseMongoUrl(cfg.MongoDeserialisedUrl, out var url) ? new Config { MongoUrl = url } : cfg;
-
     }
 
     public static async Task WriteToConfig(string path, Config config)
