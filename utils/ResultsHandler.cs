@@ -4,15 +4,20 @@ using System.Linq;
 using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using static DatabaseTypes;
 
-internal class ResultsHandler
+internal static class ResultsHandler
 {
     public static void Handle(Results results, MongoUrl mongoUrl)
     {
         MongoClient client = new(mongoUrl);
         var database = client.GetDatabase("acc_race_hub");
+        var pack = new ConventionPack();
+        pack.Add(new CamelCaseElementNameConvention());
+        ConventionRegistry.Register("camelCase", pack, t => true);
+        
         switch (results.SessionType)
         {
             case "Q":
@@ -61,7 +66,7 @@ internal class ResultsHandler
 
         UpdateDropRound(driversCollection);
         Console.WriteLine("Updated drop rounds");
-        UpdateTeamsChampionship(teamsCollection, driversCollection);
+        // UpdateTeamsChampionship(teamsCollection, driversCollection);
     }
 
     private static async void HandleQualifyingResults(Results results, IMongoDatabase database)
@@ -135,9 +140,10 @@ internal class ResultsHandler
             }
 
         UpdateOptions options = new() { IsUpsert = true };
-        var documentsToInsert = (from item in carPoints 
-            let pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value) 
-            select collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd, options))
+        var documentsToInsert = (from item in carPoints
+                let pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value)
+                select collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd,
+                    options))
             .Cast<Task>()
             .ToList();
 
@@ -154,13 +160,16 @@ internal class ResultsHandler
             var sortedRaceResults = results.SessionResult.LeaderBoardLines
                 .Join(entrylist,
                     result => result.CurrentDriver.PlayerId,
-                    entry => (entry.Drivers 
-                              ?? throw new InvalidOperationException("Cannot match a driver from entrylist with a driver in race results"))
+                    entry => (entry.Drivers
+                              ?? throw new InvalidOperationException(
+                                  "Cannot match a driver from entrylist with a driver in race results"))
                         .Select(d => d.PlayerID).FirstOrDefault(),
                     (result, entry) => new
                     {
                         Result = result,
-                        Class = (Maps.Classes)((entry.Drivers ?? throw new InvalidOperationException("Cannot match a driver from entrylist with a driver in race results"))
+                        Class = (Maps.Classes)((entry.Drivers ??
+                                                throw new InvalidOperationException(
+                                                    "Cannot match a driver from entrylist with a driver in race results"))
                             .FirstOrDefault(d => d.PlayerID == result.CurrentDriver.PlayerId)?.DriverCategory ?? 0)
                     })
                 .GroupBy(x => x.Class)
@@ -237,15 +246,16 @@ internal class ResultsHandler
         {
             while (await cursor.MoveNextAsync())
             {
-                var documentsToInsert = (from driver in cursor.Current 
-                    where driver.Finishes?.Length > 1 
-                    let finishesSorted = driver.Finishes.OrderBy(x => x.Points) 
-                    let worstFinish = finishesSorted.FirstOrDefault() 
-                    let droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish) 
-                    let pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points) 
-                    let updates = new DropRoundDefinitions(droppedRound, pointsWithDrop) 
-                    let query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex, updates.PointsWithDrop) 
-                    select collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query))
+                var documentsToInsert = (from driver in cursor.Current
+                        where driver.Finishes?.Length > 1
+                        let finishesSorted = driver.Finishes.OrderBy(x => x.Points)
+                        let worstFinish = finishesSorted.FirstOrDefault()
+                        let droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish)
+                        let pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points)
+                        let updates = new DropRoundDefinitions(droppedRound, pointsWithDrop)
+                        let query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex,
+                            updates.PointsWithDrop)
+                        select collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query))
                     .Cast<Task>()
                     .ToList();
 
@@ -258,43 +268,43 @@ internal class ResultsHandler
         }
     }
 
-    private static async void UpdateTeamsChampionship(IMongoCollection<TeamsCollection> teamsCollection,
-        IMongoCollection<DriversCollection> driversCollection)
-    {
-        var cursor = await teamsCollection.Find(_ => true).ToCursorAsync();
-        try
-        {
-            while (await cursor.MoveNextAsync())
-            {
-                // create a query which will find points of each of the drivers in the team (Drivers array in TeamsCollection) and sum them up
-                var documentsToInsert = (from team in cursor.Current
-                    let projection = Builders<DriversCollection>.Projection.Combine(
-                        Builders<DriversCollection>.Projection.Include("points")
-                        , Builders<DriversCollection>.Projection.Include("pointsWDrop"))
-                    let drivers = team.Drivers
-                    let query = Builders<DriversCollection>.Filter.In("playerId", drivers)
-                    let driver = driversCollection.Find(query)
-                    let driverPoints = driver.Project(projection).ToList()
-                    let pointsSum = driverPoints.Sum(x => x["points"].AsInt32)
-                    // throws an exception if there is no pointsWDrop field in the document
-                    let pointsWDropSum = driverPoints.Sum(x => x["pointsWDrop"].AsInt32)
-                    let updatePoints = Builders<TeamsCollection>.Update.Set("points", pointsSum)
-                    let updateDropPoints = Builders<TeamsCollection>.Update.Set("pointsWDrop", pointsWDropSum)
-                    let query2 = Builders<TeamsCollection>.Update.Combine(updatePoints, updateDropPoints)
-                    select teamsCollection.UpdateOneAsync(new BsonDocument { { "team", team.TeamName } }, query2))
-                    .Cast<Task>()
-                    .ToList();
-                
-                await Task.WhenAll(documentsToInsert);
-            }
-        }
-        finally
-        {
-            cursor.Dispose();
-        }
-        
-    }
-    
+    // private static async void UpdateTeamsChampionship(IMongoCollection<TeamsCollection> teamsCollection,
+    //     IMongoCollection<DriversCollection> driversCollection)
+    // {
+    //     var cursor = await teamsCollection.Find(_ => true).ToCursorAsync();
+    //     try
+    //     {
+    //         while (await cursor.MoveNextAsync())
+    //         {
+    //             // create a query which will find points of each of the drivers in the team (Drivers array in TeamsCollection) and sum them up
+    //             var documentsToInsert = (from team in cursor.Current
+    //                     let projection = Builders<DriversCollection>.Projection.Combine(
+    //                         Builders<DriversCollection>.Projection.Include("points")
+    //                         , Builders<DriversCollection>.Projection.Include("pointsWDrop"))
+    //                     let drivers = team.Drivers
+    //                     let query = Builders<DriversCollection>.Filter.In("playerId", drivers)
+    //                     let driver = driversCollection.Find(query)
+    //                     let driverPoints = driver.Project(projection).ToList()
+    //                     let pointsSum = driverPoints.Sum(x => x["points"].AsInt32)
+    //                     // throws an exception if there is no pointsWDrop field in the document
+    //                     let pointsWDropSum = driverPoints.Sum(x => x["pointsWDrop"].AsInt32)
+    //                     let updatePoints = Builders<TeamsCollection>.Update.Set("points", pointsSum)
+    //                     let updateDropPoints = Builders<TeamsCollection>.Update.Set("pointsWDrop", pointsWDropSum)
+    //                     let query2 = Builders<TeamsCollection>.Update.Combine(updatePoints, updateDropPoints)
+    //                     select teamsCollection.UpdateOneAsync(new BsonDocument { { "team", team.TeamName } }, query2))
+    //                 .Cast<Task>()
+    //                 .ToList();
+    //
+    //             await Task.WhenAll(documentsToInsert);
+    //         }
+    //     }
+    //     finally
+    //     {
+    //         cursor.Dispose();
+    //     }
+    //
+    // }
+
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(
         Dictionary<Maps.Classes, DriverResult[]> results)
     {
@@ -347,18 +357,7 @@ internal class ResultsHandler
 
 
     // Types
-
-    private class DriverInRaceResults
-    {
-        [BsonElement("playerId")] public string? PlayerId { get; set; }
-
-        [BsonElement("bestLap")] public int BestLap { get; set; }
-
-        [BsonElement("lapCount")] public int LapCount { get; set; }
-
-        [BsonElement("totalTime")] public int TotalTime { get; set; }
-    }
-
+    
     private class DriverInChampionshipDefinitions
     {
         public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)
