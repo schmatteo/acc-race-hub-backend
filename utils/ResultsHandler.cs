@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using static DatabaseTypes;
@@ -40,8 +39,8 @@ internal static class ResultsHandler
         var lapCount = results.SessionResult.LeaderBoardLines[0].Timing.LapCount;
         var dnfLapCount = (int)(lapCount * 0.9);
 
-        var raceCollection = database.GetCollection<BsonDocument>("race_results");
-        var manufacturersCollection = database.GetCollection<BsonDocument>("manufacturers_standings");
+        var raceCollection = database.GetCollection<RaceCollection>("race_results");
+        var manufacturersCollection = database.GetCollection<ManufacturersCollection>("manufacturers_standings");
         var driversCollection = database.GetCollection<DriversCollection>("drivers_standings");
         var entrylistCollection = database.GetCollection<EntrylistCollection>("entrylist");
         var teamsCollection = database.GetCollection<TeamsCollection>("teams");
@@ -71,7 +70,7 @@ internal static class ResultsHandler
 
     private static async void HandleQualifyingResults(Results results, IMongoDatabase database)
     {
-        var collection = database.GetCollection<BsonDocument>("race_results");
+        var collection = database.GetCollection<RaceCollection>("race_results");
 
         await InsertQualifyingIntoDatabaseAsync(collection, results);
         Console.WriteLine("Inserted qualifying results into the database");
@@ -80,27 +79,22 @@ internal static class ResultsHandler
 
     // Race results related tasks
 
-    private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<BsonDocument> collection, Results results)
+    private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<RaceCollection> collection, Results results)
     {
-        BsonArray resultsToInsert = new();
-        foreach (var driver in results.SessionResult.LeaderBoardLines)
-        {
-            DriverInRaceResults d = new()
-            {
-                PlayerId = driver.CurrentDriver.PlayerId,
-                BestLap = driver.Timing.BestLap,
-                LapCount = driver.Timing.LapCount,
-                TotalTime = driver.Timing.TotalTime
-            };
-            _ = resultsToInsert.Add(d.ToBsonDocument());
-        }
+        // BsonArray resultsToInsert = new();
+        var resultsToInsert = results.SessionResult.LeaderBoardLines
+            .Select(driver => new DriverInRaceResults() { PlayerId = driver.CurrentDriver.PlayerId, 
+                BestLap = driver.Timing.BestLap, 
+                LapCount = driver.Timing.LapCount, 
+                TotalTime = driver.Timing.TotalTime })
+            .ToList();
 
         BsonDocument searchString = new()
         {
             { "race", results.ServerName },
             { "track", results.TrackName }
         };
-        var update = Builders<BsonDocument>.Update.Set("results", resultsToInsert);
+        var update = Builders<RaceCollection>.Update.Set<List<DriverInRaceResults>>(x => x.Results, resultsToInsert);
         UpdateOptions options = new() { IsUpsert = true };
 
         try
@@ -114,7 +108,7 @@ internal static class ResultsHandler
         }
     }
 
-    private static async Task UpdateManufacturersStandingsAsync(IMongoCollection<BsonDocument> collection,
+    private static async Task UpdateManufacturersStandingsAsync(IMongoCollection<ManufacturersCollection> collection,
         Results results, int dnfLapCount)
     {
         Dictionary<int, int> carPoints = new();
@@ -141,7 +135,7 @@ internal static class ResultsHandler
 
         UpdateOptions options = new() { IsUpsert = true };
         var documentsToInsert = (from item in carPoints
-                let pointsToAdd = Builders<BsonDocument>.Update.Inc("points", item.Value)
+                let pointsToAdd = Builders<ManufacturersCollection>.Update.Inc(x => x.Points, item.Value)
                 select collection.UpdateOneAsync(new BsonDocument { { "car", Maps.Cars[item.Key] } }, pointsToAdd,
                     options))
             .Cast<Task>()
@@ -324,10 +318,11 @@ internal static class ResultsHandler
 
     // Qualifying results related tasks
 
-    private static async Task InsertQualifyingIntoDatabaseAsync(IMongoCollection<BsonDocument> collection,
+    // FIXME: qualifying results are not being updated
+    private static async Task InsertQualifyingIntoDatabaseAsync(IMongoCollection<RaceCollection> collection,
         Results results)
     {
-        BsonArray resultsToInsert = new();
+        List<QualifyingResult> resultsToInsert = new();
         foreach (var driver in results.SessionResult.LeaderBoardLines)
         {
             var query = from doc in results.Laps
@@ -338,16 +333,19 @@ internal static class ResultsHandler
             var laps = query.ToList();
             QualifyingResult result = new(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount,
                 laps);
-            _ = resultsToInsert.Add(result.ToBsonDocument());
+            resultsToInsert.Add(result);
         }
 
         UpdateOptions options = new() { IsUpsert = true };
-        var update = Builders<BsonDocument>.Update.Set("qualifyingResults", resultsToInsert);
+        var update = Builders<RaceCollection>.Update.Set(x => x.QualifyingResults, resultsToInsert);
+        var filter = Builders<RaceCollection>.Filter.Eq(x => x.Race, results.ServerName);
+        var filter2 = Builders<RaceCollection>.Filter.Eq(x => x.Track, results.TrackName);
+        var filterCombined = Builders<RaceCollection>.Filter.And(filter, filter2);
 
         try
         {
             _ = await collection.UpdateOneAsync(
-                new BsonDocument { { "race", results.ServerName }, { "track", results.TrackName } }, update, options);
+                filterCombined, update, options);
         }
         catch (Exception ex)
         {
@@ -362,12 +360,12 @@ internal static class ResultsHandler
     {
         public DriverInChampionshipDefinitions(int points, int finishingPosition, bool fastestLap, string trackName)
         {
-            PointsDefinition = Builders<DriversCollection>.Update.Inc("points", points);
+            PointsDefinition = Builders<DriversCollection>.Update.Inc(x => x.Points, points);
             DriversCollection.Finish finishToPush = new()
             {
                 TrackName = trackName, FinishingPosition = finishingPosition, FastestLap = fastestLap, Points = points
             };
-            FinishesDefinition = Builders<DriversCollection>.Update.Push("finishes", finishToPush.ToBsonDocument());
+            FinishesDefinition = Builders<DriversCollection>.Update.Push(x => x.Finishes, finishToPush);
         }
 
         public UpdateDefinition<DriversCollection> PointsDefinition { get; }
@@ -378,27 +376,11 @@ internal static class ResultsHandler
     {
         public DropRoundDefinitions(int dropRoundIndex, int pointsWithDrop)
         {
-            DropRoundIndex = Builders<DriversCollection>.Update.Set("roundDropped", dropRoundIndex);
-            PointsWithDrop = Builders<DriversCollection>.Update.Set("pointsWDrop", pointsWithDrop);
+            DropRoundIndex = Builders<DriversCollection>.Update.Set(x => x.RoundDropped, dropRoundIndex);
+            PointsWithDrop = Builders<DriversCollection>.Update.Set(x => x.PointsWithDrop, pointsWithDrop);
         }
 
         public UpdateDefinition<DriversCollection> DropRoundIndex { get; }
         public UpdateDefinition<DriversCollection> PointsWithDrop { get; }
-    }
-
-    private class QualifyingResult
-    {
-        public QualifyingResult(string playerId, int bestLap, int lapCount, List<int> laps)
-        {
-            PlayerId = playerId;
-            BestLap = bestLap;
-            LapCount = lapCount;
-            Laps = laps;
-        }
-
-        private string PlayerId { get; }
-        private int BestLap { get; }
-        private int LapCount { get; }
-        private List<int> Laps { get; }
     }
 }

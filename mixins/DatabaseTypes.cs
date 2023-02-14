@@ -97,4 +97,46 @@ internal class DatabaseTypes
 
         public int TotalTime { get; set; }
     }
+
+    public class RaceCollection
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string? Id { get; set; }
+        
+        public string? Race { get; set; }
+        
+        public List<DriverInRaceResults>? Results { get; set; }
+        
+        public List<QualifyingResult> QualifyingResults { get; set; }
+        
+        public string? Track { get; set; }
+    }
+
+    public class ManufacturersCollection
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; }
+        
+        public string? Car { get; set; }
+        
+        public int Points { get; set; }
+    }
+    
+    public class QualifyingResult
+    {
+        public QualifyingResult(string playerId, int bestLap, int lapCount, List<int> laps)
+        {
+            PlayerId = playerId;
+            BestLap = bestLap;
+            LapCount = lapCount;
+            Laps = laps;
+        }
+
+        public string PlayerId { get; set; }
+        public int BestLap { get; set; }
+        public int LapCount { get; set;  }
+        public List<int> Laps { get; set; }
+    }
 }
