@@ -42,8 +42,7 @@ internal static class ResultsHandler
         var manufacturersCollection = database.GetCollection<ManufacturersCollection>("manufacturers_standings");
         var driversCollection = database.GetCollection<DriversCollection>("drivers_standings");
         var entrylistCollection = database.GetCollection<EntrylistCollection>("entrylist");
-        var teamsCollection = database.GetCollection<TeamsCollection>("teams");
-
+        
         var insertRaceTask = InsertRaceIntoDatabaseAsync(raceCollection, results);
         var updateManufacturersTask = UpdateManufacturersStandingsAsync(manufacturersCollection, results, dnfLapCount);
         var updateIndividualResultsTask =
@@ -64,7 +63,6 @@ internal static class ResultsHandler
 
         UpdateDropRound(driversCollection);
         Console.WriteLine("Updated drop rounds");
-        // UpdateTeamsChampionship(teamsCollection, driversCollection);
     }
 
     private static async void HandleQualifyingResults(Results results, IMongoDatabase database)
@@ -80,7 +78,6 @@ internal static class ResultsHandler
 
     private static async Task InsertRaceIntoDatabaseAsync(IMongoCollection<RaceCollection> collection, Results results)
     {
-        // BsonArray resultsToInsert = new();
         var resultsToInsert = results.SessionResult.LeaderBoardLines
             .Select(driver => new DriverInRaceResults
             {
@@ -263,43 +260,6 @@ internal static class ResultsHandler
             cursor.Dispose();
         }
     }
-
-    // private static async void UpdateTeamsChampionship(IMongoCollection<TeamsCollection> teamsCollection,
-    //     IMongoCollection<DriversCollection> driversCollection)
-    // {
-    //     var cursor = await teamsCollection.Find(_ => true).ToCursorAsync();
-    //     try
-    //     {
-    //         while (await cursor.MoveNextAsync())
-    //         {
-    //             // create a query which will find points of each of the drivers in the team (Drivers array in TeamsCollection) and sum them up
-    //             var documentsToInsert = (from team in cursor.Current
-    //                     let projection = Builders<DriversCollection>.Projection.Combine(
-    //                         Builders<DriversCollection>.Projection.Include("points")
-    //                         , Builders<DriversCollection>.Projection.Include("pointsWDrop"))
-    //                     let drivers = team.Drivers
-    //                     let query = Builders<DriversCollection>.Filter.In("playerId", drivers)
-    //                     let driver = driversCollection.Find(query)
-    //                     let driverPoints = driver.Project(projection).ToList()
-    //                     let pointsSum = driverPoints.Sum(x => x["points"].AsInt32)
-    //                     // throws an exception if there is no pointsWDrop field in the document
-    //                     let pointsWDropSum = driverPoints.Sum(x => x["pointsWDrop"].AsInt32)
-    //                     let updatePoints = Builders<TeamsCollection>.Update.Set("points", pointsSum)
-    //                     let updateDropPoints = Builders<TeamsCollection>.Update.Set("pointsWDrop", pointsWDropSum)
-    //                     let query2 = Builders<TeamsCollection>.Update.Combine(updatePoints, updateDropPoints)
-    //                     select teamsCollection.UpdateOneAsync(new BsonDocument { { "team", team.TeamName } }, query2))
-    //                 .Cast<Task>()
-    //                 .ToList();
-    //
-    //             await Task.WhenAll(documentsToInsert);
-    //         }
-    //     }
-    //     finally
-    //     {
-    //         cursor.Dispose();
-    //     }
-    //
-    // }
 
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(
         Dictionary<Maps.Classes, DriverResult[]> results)
