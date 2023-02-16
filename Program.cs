@@ -33,8 +33,6 @@ internal class Program
         // Start watching for results files
         FileWatcher.Watch("../../..", results =>
         {
-            if (results?.TrackName is null) return;
-
             if (_mongoUrl is not null)
                 ResultsHandler.Handle(results, _mongoUrl);
             else
