@@ -29,19 +29,17 @@ internal class Program
                     throw new Exception("No MongoDB URL. Try running the app with --mongourl <url> flag");
             }
         });
+        
+        // Start watching for results files
+        FileWatcher.Watch("../../..", results =>
+        {
+            if (results?.TrackName is null) return;
 
-        Parallel.Invoke(
-            HttpServer.Run,
-            () => FileWatcher.Watch("../../..", results =>
-            {
-                if (results?.TrackName is null) return;
-
-                if (_mongoUrl is not null)
-                    ResultsHandler.Handle(results, _mongoUrl);
-                else
-                    Console.Error.WriteLine(
-                        "Cannot process results file. MongoDB URL is null. Try closing the application and reopening it with --mongourl flag");
-            })
-        );
+            if (_mongoUrl is not null)
+                ResultsHandler.Handle(results, _mongoUrl);
+            else
+                Console.Error.WriteLine(
+                    "Cannot process results file. MongoDB URL is null. Try closing the application and reopening it with --mongourl flag");
+        });
     }
 }
