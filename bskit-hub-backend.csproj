@@ -111,6 +111,12 @@
         <None Remove="221118_223434_R.json" />
         <None Remove="221118_205259_Q.json" />
         <None Remove="221021_205252_Q.json" />
+        <Compile Remove="Server.cs" />
+        <None Include="Server.cs" />
+        <Compile Remove="Logger.cs" />
+        <None Include="Logger.cs" />
+        <Compile Remove="test.cs" />
+        <None Include="test.cs" />
     </ItemGroup>
     <ItemGroup>
         <Folder Include=".git\objects\info\" />
