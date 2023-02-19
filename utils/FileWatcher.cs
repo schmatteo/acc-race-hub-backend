@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 
-internal class FileWatcher
+internal static class FileWatcher
 {
     public static void Watch(string path, Action<Results> callback)
     {

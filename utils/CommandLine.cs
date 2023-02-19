@@ -2,7 +2,7 @@
 using System.CommandLine;
 using System.Threading.Tasks;
 
-internal class CommandLine
+internal static class CommandLine
 {
     public static async Task<int> HandleArgsAsync(string[] args, Action<string?> callback)
     {

@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using MongoDB.Driver;
 
-internal class Program
+internal static class Program
 {
     private static MongoUrl? _mongoUrl;
 

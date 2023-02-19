@@ -283,19 +283,13 @@ internal static class ResultsHandler
     private static async Task InsertQualifyingIntoDatabaseAsync(IMongoCollection<RaceCollection> collection,
         Results results)
     {
-        List<QualifyingResult> resultsToInsert = new();
-        foreach (var driver in results.SessionResult.LeaderBoardLines)
-        {
-            var query = from doc in results.Laps
-                where doc.CarId == driver.Car.CarId
-                where doc.IsValidForBest
-                select doc.Laptime;
-
-            var laps = query.ToList();
-            QualifyingResult result = new(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount,
-                laps);
-            resultsToInsert.Add(result);
-        }
+        List<QualifyingResult> resultsToInsert = (from driver in results.SessionResult.LeaderBoardLines 
+            let query = from doc in results.Laps 
+                where doc.CarId == driver.Car.CarId 
+                where doc.IsValidForBest 
+                select doc.Laptime 
+            let laps = query.ToList() 
+            select new QualifyingResult(driver.CurrentDriver.PlayerId, driver.Timing.BestLap, driver.Timing.LapCount, laps)).ToList();
 
         UpdateOptions options = new() { IsUpsert = true };
         var update = Builders<RaceCollection>.Update.Set(x => x.QualifyingResults, resultsToInsert);

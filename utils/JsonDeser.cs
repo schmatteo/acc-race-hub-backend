@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-internal class JsonDeser
+internal static class JsonDeser
 {
     public static async Task<T> DeserAsync<T>(MemoryStream json)
     {
