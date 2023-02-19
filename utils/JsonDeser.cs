@@ -16,6 +16,10 @@ internal static class JsonDeser
         {
             await Console.Error.WriteLineAsync($"Error reading JSON {e.Message}");
         }
+        catch (Exception e)
+        {
+            await Console.Error.WriteLineAsync($"{e.Message}");
+        }
 
         throw new JsonException("Cannot deserialize JSON");
     }

@@ -57,6 +57,10 @@ internal class Config
         {
             callback(null);
         }
+        catch (Exception)
+        {
+            callback(null);
+        }
     }
 
     // When this method returns, mongoUrl parameter contains the result of parsing or null on failure
