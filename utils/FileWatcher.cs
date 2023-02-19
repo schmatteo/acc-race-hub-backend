@@ -1,12 +1,15 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 internal static class FileWatcher
 {
+    private static FileSystemWatcher watcher;
     public static void Watch(string path, Action<Results> callback)
     {
-        using FileSystemWatcher watcher = new(path);
+
+        watcher = new(path);
 
         watcher.NotifyFilter = NotifyFilters.FileName;
 
@@ -15,7 +18,7 @@ internal static class FileWatcher
         watcher.Filter = "*.json";
         watcher.EnableRaisingEvents = true;
         Console.WriteLine($"Listening for new files in {watcher.Path}");
-        _ = Console.ReadLine();
+        Thread.Sleep(Timeout.Infinite);
     }
 
 
