@@ -14,7 +14,7 @@ internal static class ResultsHandler
         MongoClient client = new(mongoUrl);
         var database = client.GetDatabase("acc_race_hub");
         var pack = new ConventionPack { new CamelCaseElementNameConvention() };
-        ConventionRegistry.Register("camelCase", pack, t => true);
+        ConventionRegistry.Register("camelCase", pack, _ => true);
 
         switch (results.SessionType)
         {
@@ -233,32 +233,26 @@ internal static class ResultsHandler
 
     private static async void UpdateDropRound(IMongoCollection<DriversCollection> collection)
     {
-        var cursor = await collection.Find(_ => true).ToCursorAsync();
+      // var cursor = await collection.Find(_ => true).ToCursorAsync();
 
-        try
-        {
-            while (await cursor.MoveNextAsync())
-            {
-                var documentsToInsert = (from driver in cursor.Current
-                        where driver.Finishes?.Length > 1
-                        let finishesSorted = driver.Finishes.OrderBy(x => x.Points)
-                        let worstFinish = finishesSorted.FirstOrDefault()
-                        let droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish)
-                        let pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points)
-                        let updates = new DropRoundDefinitions(droppedRound, pointsWithDrop)
-                        let query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex,
-                            updates.PointsWithDrop)
-                        select collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query))
-                    .Cast<Task>()
-                    .ToList();
+      using var cursor = await collection.Find(_ => true).ToCursorAsync();
+      while (await cursor.MoveNextAsync())
+      {
+        var documentsToInsert = (from driver in cursor.Current
+            where driver.Finishes?.Length > 1
+            let finishesSorted = driver.Finishes.OrderBy(x => x.Points)
+            let worstFinish = finishesSorted.FirstOrDefault()
+            let droppedRound = Array.FindIndex(driver.Finishes, x => x == worstFinish)
+            let pointsWithDrop = finishesSorted.Skip(1).Sum(x => x.Points)
+            let updates = new DropRoundDefinitions(droppedRound, pointsWithDrop)
+            let query = Builders<DriversCollection>.Update.Combine(updates.DropRoundIndex,
+              updates.PointsWithDrop)
+            select collection.UpdateOneAsync(new BsonDocument { { "playerId", driver.PlayerId } }, query))
+          .Cast<Task>()
+          .ToList();
 
-                await Task.WhenAll(documentsToInsert);
-            }
-        }
-        finally
-        {
-            cursor.Dispose();
-        }
+        await Task.WhenAll(documentsToInsert);
+      }
     }
 
     private static Dictionary<Maps.Classes, DriverResult> GetFastestLap(
